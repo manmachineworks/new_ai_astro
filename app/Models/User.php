@@ -24,6 +24,7 @@ class User extends Authenticatable
         'avatar',
         'is_active',
         'phone_verified_at',
+        'firebase_uid',
     ];
 
     /**

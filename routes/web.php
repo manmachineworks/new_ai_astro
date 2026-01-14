@@ -11,12 +11,21 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
+Route::get('/test-config', function () {
+    return [
+        'firebase.credentials.config' => config('firebase.credentials'),
+        'env.FIREBASE_CREDENTIALS' => env('FIREBASE_CREDENTIALS'),
+        'storage_path' => storage_path('app/firebase/firebase-admin.json'),
+    ];
+});
+
 // Auth Routes
 Route::get('/login', [AuthController::class, 'userLoginView'])->name('login');
 Route::get('/admin/login', [AuthController::class, 'adminLoginView'])->name('admin.login');
 Route::get('/astrologer/login', [AuthController::class, 'astrologerLoginView'])->name('astrologer.login');
 
 Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
+Route::post('/login/firebase', [AuthController::class, 'loginWithFirebase'])->name('auth.login.firebase');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // User Portal
