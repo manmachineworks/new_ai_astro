@@ -1,24 +1,39 @@
 <?php
 
-use App\Http\Controllers\PhoneAuthController;
-use App\Http\Controllers\FirebaseExampleController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AstrologerController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
+// Public Pages
 Route::get('/', function () {
-    return redirect()->route('auth.phone.show');
+    return view('welcome');
+})->name('home');
+
+// Auth Routes
+Route::get('/login', [AuthController::class, 'userLoginView'])->name('login');
+Route::get('/admin/login', [AuthController::class, 'adminLoginView'])->name('admin.login');
+Route::get('/astrologer/login', [AuthController::class, 'astrologerLoginView'])->name('astrologer.login');
+
+Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+// User Portal
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', [UserController::class, 'index'])->name('dashboard');
+    Route::get('/wallet', [UserController::class, 'wallet'])->name('user.wallet');
 });
 
-Route::middleware('guest')->group(function () {
-    Route::get('/auth/phone', [PhoneAuthController::class, 'show'])->name('auth.phone.show');
-    Route::post('/auth/phone/verify', [PhoneAuthController::class, 'verify'])->name('auth.phone.verify');
+// Admin Portal
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
+    Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::get('/astrologers', [AdminController::class, 'astrologers'])->name('astrologers');
 });
 
-Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
-
-    Route::post('/auth/logout', [PhoneAuthController::class, 'logout'])->name('auth.logout');
+// Astrologer Portal
+Route::middleware(['auth', 'astrologer'])->prefix('astrologer')->name('astrologer.')->group(function () {
+    Route::get('/dashboard', [AstrologerController::class, 'index'])->name('dashboard');
+    Route::get('/schedule', [AstrologerController::class, 'schedule'])->name('schedule');
 });
-
-Route::get('/firebase/health', [FirebaseExampleController::class, 'health'])->name('firebase.health');
