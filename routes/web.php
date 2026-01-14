@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Route;
 // Public Pages
 Route::get('/', function () {
     return view('welcome');
+})->name('home');
+
 // Auth Routes
 Route::get('/login', [AuthController::class, 'userLoginView'])->name('login');
 Route::get('/admin/login', [AuthController::class, 'adminLoginView'])->name('admin.login');
