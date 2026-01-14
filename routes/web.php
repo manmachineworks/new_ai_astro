@@ -9,16 +9,6 @@ use Illuminate\Support\Facades\Route;
 // Public Pages
 Route::get('/', function () {
     return view('welcome');
-})->name('home');
-
-Route::get('/test-config', function () {
-    return [
-        'firebase.credentials.config' => config('firebase.credentials'),
-        'env.FIREBASE_CREDENTIALS' => env('FIREBASE_CREDENTIALS'),
-        'storage_path' => storage_path('app/firebase/firebase-admin.json'),
-    ];
-});
-
 // Auth Routes
 Route::get('/login', [AuthController::class, 'userLoginView'])->name('login');
 Route::get('/admin/login', [AuthController::class, 'adminLoginView'])->name('admin.login');
