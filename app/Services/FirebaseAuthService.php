@@ -12,7 +12,7 @@ class FirebaseAuthService
 
     public function __construct(Factory $factory)
     {
-        $credentials = config('firebase.projects.app.credentials');
+        $credentials = config('firebase.credentials');
         $this->auth = $factory
             ->withServiceAccount($credentials)
             ->createAuth();

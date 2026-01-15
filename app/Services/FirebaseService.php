@@ -2,43 +2,56 @@
 
 namespace App\Services;
 
-use Kreait\Firebase\Exception\Auth\FailedToVerifyToken;
-use Kreait\Laravel\Firebase\Facades\Firebase;
-use Psr\Log\LoggerInterface;
+use Kreait\Firebase\Auth;
+use Kreait\Firebase\Factory;
+use RuntimeException;
 
 class FirebaseService
 {
-    protected $auth;
-    protected $logger;
+    private Auth $auth;
 
-    public function __construct(LoggerInterface $logger)
+    public function __construct()
     {
-        $this->auth = Firebase::auth();
-        $this->logger = $logger;
+        $envPath = env('FIREBASE_CREDENTIALS');
+        if (!$envPath) {
+            throw new RuntimeException('FIREBASE_CREDENTIALS is not set. Add it to your .env file.');
+        }
+
+        $credentialsPath = storage_path($envPath);
+        if (!file_exists($credentialsPath)) {
+            // Normalize "storage/..." env values to avoid double "storage/storage" paths.
+            $credentialsPath = storage_path($this->normalizePath($envPath));
+        }
+
+        if (!file_exists($credentialsPath)) {
+            throw new RuntimeException("Firebase credentials file not found: {$credentialsPath}");
+        }
+
+        if (!is_readable($credentialsPath)) {
+            throw new RuntimeException("Firebase credentials file is not readable: {$credentialsPath}");
+        }
+
+        try {
+            $this->auth = (new Factory())
+                ->withServiceAccount($credentialsPath)
+                ->createAuth();
+        } catch (\Throwable $e) {
+            throw new RuntimeException('Invalid Firebase credentials: '.$e->getMessage(), 0, $e);
+        }
     }
 
-    /**
-     * Verify the Firebase ID Token.
-     *
-     * @param string $idToken
-     * @return array|null Returns array with 'uid', 'phone_number' if valid, null otherwise.
-     */
-    public function verifyToken(string $idToken): ?array
+    public function auth(): Auth
     {
-        try {
-            $verifiedIdToken = $this->auth->verifyIdToken($idToken);
-            $claims = $verifiedIdToken->claims();
+        return $this->auth;
+    }
 
-            return [
-                'uid' => $claims->get('sub'),
-                'phone_number' => $claims->get('phone_number'),
-            ];
-        } catch (FailedToVerifyToken $e) {
-            $this->logger->error('Firebase Token Verification Failed: ' . $e->getMessage());
-            return null;
-        } catch (\Throwable $e) {
-            $this->logger->error('Firebase Auth Error: ' . $e->getMessage());
-            return null;
+    private function normalizePath(string $path): string
+    {
+        $clean = ltrim($path, "\\/");
+        if (str_starts_with($clean, 'storage/')) {
+            $clean = substr($clean, strlen('storage/'));
         }
+
+        return $clean;
     }
 }

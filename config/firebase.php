@@ -1,34 +1,13 @@
 <?php
 
-declare(strict_types=1);
+$credentials = env('FIREBASE_CREDENTIALS', 'app/firebase/firebase-admin.json');
+$credentials = ltrim($credentials, '\\/');
+if (str_starts_with($credentials, 'storage/')) {
+    $credentials = substr($credentials, strlen('storage/'));
+}
 
 return [
-    'default' => 'app',
-
-    'projects' => [
-        'app' => [
-            'credentials' => env('FIREBASE_CREDENTIALS', storage_path('app/firebase/firebase-admin.json')),
-
-            'auth' => [
-                'tenant_id' => env('FIREBASE_AUTH_TENANT_ID'),
-            ],
-
-            'firestore' => [],
-            'database' => [],
-            'storage' => [
-                'default_bucket' => env('FIREBASE_STORAGE_DEFAULT_BUCKET'),
-            ],
-            'cache_store' => 'file',
-            'logging' => [
-                'http_log_channel' => null,
-                'http_debug_log_channel' => null,
-            ],
-            'http_client_options' => [
-                'proxy' => null,
-                'timeout' => null,
-            ],
-        ],
-    ],
+    'credentials' => storage_path($credentials),
 
     'web' => [
         'api_key' => env('FIREBASE_WEB_API_KEY'),
