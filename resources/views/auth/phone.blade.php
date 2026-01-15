@@ -181,7 +181,7 @@
                     throw new Error(data?.message || 'Verification failed.');
                 }
 
-                window.location.href = data.redirect || '{{ route('dashboard') }}';
+                window.location.href = data.redirect || '{{ route('user.dashboard') }}';
             } catch (error) {
                 console.error(error);
                 const message = error.message || 'Verification failed. Please try again.';

@@ -65,11 +65,11 @@ class PhoneAuthController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Authenticated',
-                'redirect' => route('dashboard'),
+                'redirect' => route('user.dashboard'),
             ]);
         }
 
-        return redirect()->route('dashboard');
+        return redirect()->route('user.dashboard');
     }
 
     public function logout(Request $request): RedirectResponse

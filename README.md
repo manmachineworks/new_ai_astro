@@ -7,6 +7,62 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Admin Dashboard (Laravel 11/12)
+
+Production-ready admin dashboard scaffolding with roles, permissions, activity logging, and reporting widgets.
+
+### Stack
+- Laravel 11/12
+- MySQL
+- Laravel Sanctum
+- Spatie Laravel Permission
+- Blade + Bootstrap
+- Chart.js
+- Laravel Queues & Jobs
+
+### Folder Structure
+- `app/Http/Controllers/Admin`
+- `app/Models/AdminActivityLog.php`
+- `app/Policies/UserPolicy.php`
+- `app/Services/AdminActivityLogger.php`
+- `database/migrations/2026_01_15_200000_create_permission_tables.php`
+- `database/migrations/2026_01_15_200100_create_admin_activity_logs_table.php`
+- `database/migrations/2026_01_15_200200_add_admin_fields_to_users_table.php`
+- `database/seeders/RolePermissionSeeder.php`
+- `resources/views/admin`
+- `routes/admin.php`
+
+### Setup
+1. Install packages:
+```bash
+composer require laravel/sanctum spatie/laravel-permission
+php artisan vendor:publish --provider="Laravel\\Sanctum\\SanctumServiceProvider"
+php artisan vendor:publish --provider="Spatie\\Permission\\PermissionServiceProvider"
+```
+2. Run migrations and seeders:
+```bash
+php artisan migrate
+php artisan db:seed
+```
+3. Configure admin credentials in `.env` (optional):
+```
+ADMIN_EMAIL=admin@example.com
+ADMIN_PHONE=9999999999
+ADMIN_PASSWORD=ChangeMe123!
+```
+4. Login with the seeded Super Admin user at `/admin/login`.
+
+### Routes
+- Admin dashboard: `/admin`
+- Roles: `/admin/roles`
+- Permissions: `/admin/permissions`
+- Users: `/admin/users`
+
+### Security Notes
+- Role/permission checks enforced in `routes/admin.php`.
+- Policy checks enforced in `app/Http/Controllers/Admin/AdminUserController.php`.
+- Admin actions logged via `app/Services/AdminActivityLogger.php`.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
