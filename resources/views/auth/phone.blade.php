@@ -14,7 +14,7 @@
         <div class="row justify-content-center">
             <div class="col-lg-6">
                 <div class="text-center mb-4">
-                    <h1 class="h3 fw-bold">Sign in with your phone</h1>
+                    <h1 class="h3 fw-bold">SSign in with your phone</h1>
                     <p class="text-muted mb-0">We’ll send a one-time code via SMS to verify it’s you.</p>
                 </div>
 
