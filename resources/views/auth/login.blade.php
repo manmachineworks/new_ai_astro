@@ -97,33 +97,47 @@
                 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
                 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-                const firebaseConfig = {
-                    apiKey: "{{ config('services.firebase.api_key') }}",
-                    authDomain: "{{ config('services.firebase.auth_domain') }}",
-                    projectId: "{{ config('services.firebase.project_id') }}",
-                    storageBucket: "{{ config('services.firebase.storage_bucket') }}",
-                    messagingSenderId: "{{ config('services.firebase.messaging_sender_id') }}",
-                    appId: "{{ config('services.firebase.app_id') }}",
-                    measurementId: "{{ config('services.firebase.measurement_id') }}"
-                };
+                const firebaseConfig = @json(config('firebase.web'));
+                const errorMessage = document.getElementById('error-message');
+                const sendOtpBtn = document.getElementById('send-otp-btn');
+                const verifyOtpBtn = document.getElementById('verify-otp-btn');
 
-                const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
-                auth.useDeviceLanguage();
+                if (!firebaseConfig.api_key || !firebaseConfig.auth_domain || !firebaseConfig.project_id) {
+                    errorMessage.innerText = 'Firebase configuration is missing. Please update your .env file.';
+                    errorMessage.classList.remove('hidden');
+                    sendOtpBtn.disabled = true;
+                    verifyOtpBtn.disabled = true;
+                } else {
+                    const app = initializeApp({
+                        apiKey: firebaseConfig.api_key,
+                        authDomain: firebaseConfig.auth_domain,
+                        projectId: firebaseConfig.project_id,
+                        appId: firebaseConfig.app_id,
+                        messagingSenderId: firebaseConfig.messaging_sender_id,
+                        measurementId: firebaseConfig.measurement_id,
+                    });
+                    const auth = getAuth(app);
+                    auth.useDeviceLanguage();
 
-                window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                    'size': 'normal',
-                    'callback': (response) => {
-                        // reCAPTCHA solved, allow signInWithPhoneNumber.
-                    },
-                    'expired-callback': () => {
-                        // Response expired. Ask user to solve reCAPTCHA again.
-                    }
-                });
+                    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                        'size': 'normal',
+                        'callback': () => {
+                            // reCAPTCHA solved, allow signInWithPhoneNumber.
+                        },
+                        'expired-callback': () => {
+                            // Response expired. Ask user to solve reCAPTCHA again.
+                        }
+                    });
+                }
 
                 window.handlePhoneLogin = function (e) {
                     e.preventDefault();
                     const phoneNumber = document.getElementById('phone').value;
+                    if (!window.recaptchaVerifier) {
+                        errorMessage.innerText = 'Firebase is not configured. Please contact support.';
+                        errorMessage.classList.remove('hidden');
+                        return;
+                    }
                     const appVerifier = window.recaptchaVerifier;
 
                     const btn = document.getElementById('send-otp-btn');
@@ -151,6 +165,16 @@
 
                 window.verifyOtp = function () {
                     const code = document.getElementById('otp').value;
+                    if (!window.confirmationResult) {
+                        errorMessage.innerText = 'Please request an OTP first.';
+                        errorMessage.classList.remove('hidden');
+                        return;
+                    }
+                    if (!code) {
+                        errorMessage.innerText = 'Enter the OTP you received.';
+                        errorMessage.classList.remove('hidden');
+                        return;
+                    }
                     window.confirmationResult.confirm(code).then((result) => {
                         // User signed in successfully with Firebase
                         const user = result.user;

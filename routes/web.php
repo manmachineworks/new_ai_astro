@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AstrologerController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PhoneAuthController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,9 @@ Route::get('/astrologer/login', [AuthController::class, 'astrologerLoginView'])-
 Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
 Route::post('/login/firebase', [AuthController::class, 'loginWithFirebase'])->name('auth.login.firebase');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/phone', [PhoneAuthController::class, 'show'])->name('auth.phone.show');
+Route::post('/phone/verify', [PhoneAuthController::class, 'verify'])->name('auth.phone.verify');
+Route::post('/phone/logout', [PhoneAuthController::class, 'logout'])->name('auth.phone.logout');
 
 // User Portal
 Route::middleware(['auth'])->group(function () {

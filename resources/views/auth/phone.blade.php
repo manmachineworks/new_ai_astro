@@ -15,12 +15,12 @@
             <div class="col-lg-6">
                 <div class="text-center mb-4">
                     <h1 class="h3 fw-bold">Sign in with your phone</h1>
-                    <p class="text-muted mb-0">We’ll send a one-time code via SMS to verify it’s you.</p>
+                    <p class="text-muted mb-0">We'll send a one-time code via SMS to verify it's you.</p>
                 </div>
 
                 @if($errors->any())
                     <div class="alert alert-danger">
-                        <strong>Couldn’t verify:</strong> {{ $errors->first() }}
+                        <strong>Couldn't verify:</strong> {{ $errors->first() }}
                     </div>
                 @endif
 
@@ -67,23 +67,6 @@
         const firebaseConfig = @json(config('firebase.web'));
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-        if (!firebaseConfig.api_key) {
-            console.warn('Firebase web config is missing. Update your .env values.');
-        }
-
-        firebase.initializeApp({
-            apiKey: firebaseConfig.api_key,
-            authDomain: firebaseConfig.auth_domain,
-            projectId: firebaseConfig.project_id,
-            appId: firebaseConfig.app_id,
-            messagingSenderId: firebaseConfig.messaging_sender_id,
-            measurementId: firebaseConfig.measurement_id,
-        });
-
-        const auth = firebase.auth();
-        let confirmationResult = null;
-        let recaptchaVerifier = null;
-
         const alertArea = document.getElementById('alert-area');
         const sendBtn = document.getElementById('send-otp');
         const verifyBtn = document.getElementById('verify-otp');
@@ -103,6 +86,29 @@
             alertArea.querySelector('.alert').textContent = '';
         };
 
+        const firebaseConfigMissing = !firebaseConfig.api_key || !firebaseConfig.auth_domain || !firebaseConfig.project_id;
+        if (firebaseConfigMissing) {
+            console.warn('Firebase web config is missing. Update your .env values.');
+            sendBtn.disabled = true;
+            verifyBtn.disabled = true;
+            setAlert('Firebase configuration is missing. Please update your .env file.', 'danger');
+        }
+
+        if (!firebaseConfigMissing) {
+            firebase.initializeApp({
+                apiKey: firebaseConfig.api_key,
+                authDomain: firebaseConfig.auth_domain,
+                projectId: firebaseConfig.project_id,
+                appId: firebaseConfig.app_id,
+                messagingSenderId: firebaseConfig.messaging_sender_id,
+                measurementId: firebaseConfig.measurement_id,
+            });
+        }
+
+        const auth = firebaseConfigMissing ? null : firebase.auth();
+        let confirmationResult = null;
+        let recaptchaVerifier = null;
+
         const initRecaptcha = () => {
             if (recaptchaVerifier) return recaptchaVerifier;
             recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
@@ -119,6 +125,10 @@
 
         const sendOtp = async () => {
             clearAlert();
+            if (!auth) {
+                setAlert('Firebase is not configured. Please contact support.', 'danger');
+                return;
+            }
             const phone = phoneInput.value.trim();
             if (!phone.startsWith('+')) {
                 setAlert('Please include the country code, e.g. +15555550123.', 'warning');
