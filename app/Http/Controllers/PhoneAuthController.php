@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Spatie\Permission\Models\Role;
 
 class PhoneAuthController extends Controller
 {
@@ -46,6 +47,7 @@ class PhoneAuthController extends Controller
                 'phone' => $phone,
                 'firebase_uid' => $uid,
             ]);
+            $this->assignDefaultRole($user);
         } else {
             $updates = [];
             if (empty($user->firebase_uid)) {
@@ -57,6 +59,9 @@ class PhoneAuthController extends Controller
             if (!empty($updates)) {
                 $user->fill($updates)->save();
             }
+            if ($user->getRoleNames()->isEmpty()) {
+                $this->assignDefaultRole($user);
+            }
         }
 
         Auth::login($user);
@@ -65,11 +70,11 @@ class PhoneAuthController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Authenticated',
-                'redirect' => route('user.dashboard'),
+                'redirect' => $this->dashboardRoute($user),
             ]);
         }
 
-        return redirect()->route('user.dashboard');
+        return redirect()->to($this->dashboardRoute($user));
     }
 
     public function logout(Request $request): RedirectResponse
@@ -101,5 +106,27 @@ class PhoneAuthController extends Controller
         }
 
         return $clean ? '+' . ltrim($clean, '+') : '';
+    }
+
+    protected function dashboardRoute(User $user): string
+    {
+        if ($user->hasAnyRole(['Super Admin', 'Admin'])) {
+            return route('admin.dashboard');
+        }
+
+        if ($user->hasRole('Astrologer')) {
+            return route('astrologer.dashboard');
+        }
+
+        return route('user.dashboard');
+    }
+
+    protected function assignDefaultRole(User $user): void
+    {
+        if (!Role::where('name', 'User')->exists()) {
+            return;
+        }
+
+        $user->assignRole('User');
     }
 }

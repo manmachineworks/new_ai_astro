@@ -24,7 +24,7 @@ return new class extends Migration
             }
         });
 
-        if (Schema::hasColumn('users', 'email')) {
+        if (Schema::hasColumn('users', 'email') && $this->isMysql()) {
             DB::statement('ALTER TABLE users MODIFY email VARCHAR(191) NULL');
             if (!$this->indexExists('users', 'users_email_unique')) {
                 DB::statement('CREATE UNIQUE INDEX users_email_unique ON users (email)');
@@ -50,5 +50,10 @@ return new class extends Migration
         );
 
         return (int) ($results[0]->count ?? 0) > 0;
+    }
+
+    private function isMysql(): bool
+    {
+        return Schema::getConnection()->getDriverName() === 'mysql';
     }
 };

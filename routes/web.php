@@ -23,6 +23,12 @@ Route::middleware('auth')->group(function () {
         return view('user.dashboard');
     })->name('user.dashboard');
 
+    Route::middleware('role:Astrologer')->group(function () {
+        Route::get('/astrologer/dashboard', function () {
+            return view('astrologer.dashboard');
+        })->name('astrologer.dashboard');
+    });
+
     Route::post('/auth/logout', [PhoneAuthController::class, 'logout'])->name('auth.logout');
 });
 
