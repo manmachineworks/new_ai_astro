@@ -10,31 +10,64 @@ class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        $permissions = [
+        $adminPermissions = [
+            'manage_users',
+            'manage_astrologers',
+            'verify_astrologers',
+            'manage_reports',
+            'manage_pricing',
+            'manage_visibility',
+            'manage_roles_permissions',
+            'manage_platform_settings',
+            'view_wallets',
+            'view_phonepe_transactions',
+            'refund_payments',
+            'credit_wallet',
+            'debit_wallet',
+            'view_call_logs',
+            'view_chat_logs',
+        ];
+
+        $astrologerPermissions = [
+            'manage_profile',
+            'manage_pricing',
+            'manage_availability',
+            'manage_toggles',
+            'view_call_logs',
+            'view_chat_logs',
+        ];
+
+        $userPermissions = [
+            'browse_astrologers',
+            'initiate_chat',
+            'initiate_call',
+            'manage_appointments',
+            'recharge_wallet',
+            'view_history',
+        ];
+
+        $legacyPermissions = [
             'view_users',
             'create_users',
             'edit_users',
             'delete_users',
             'block_users',
             'view_astrologers',
-            'verify_astrologers',
             'edit_astrologers',
             'enable_disable_astrologers',
             'view_kyc_documents',
-            'view_call_logs',
-            'view_chat_logs',
             'export_call_reports',
-            'view_wallets',
-            'credit_wallet',
-            'debit_wallet',
-            'view_phonepe_transactions',
-            'refund_payments',
-            'manage_ai_chat_price',
-            'manage_platform_settings',
-            'manage_roles_permissions',
             'view_reports',
             'export_reports',
+            'manage_ai_chat_price',
         ];
+
+        $permissions = array_values(array_unique(array_merge(
+            $adminPermissions,
+            $astrologerPermissions,
+            $userPermissions,
+            $legacyPermissions
+        )));
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(
@@ -45,24 +78,22 @@ class RolePermissionSeeder extends Seeder
 
         $roles = [
             'Super Admin' => $permissions,
-            'Admin' => [
-                'view_users',
-                'create_users',
-                'edit_users',
-                'block_users',
-                'view_astrologers',
-                'verify_astrologers',
-                'edit_astrologers',
-                'enable_disable_astrologers',
-                'view_call_logs',
-                'view_chat_logs',
-                'view_wallets',
-                'view_phonepe_transactions',
-                'view_reports',
-                'export_reports',
-            ],
-            'Astrologer' => [],
-            'User' => [],
+            'Admin' => array_values(array_unique(array_merge(
+                $adminPermissions,
+                [
+                    'view_users',
+                    'create_users',
+                    'edit_users',
+                    'block_users',
+                    'view_astrologers',
+                    'edit_astrologers',
+                    'enable_disable_astrologers',
+                    'view_reports',
+                    'export_reports',
+                ]
+            ))),
+            'Astrologer' => $astrologerPermissions,
+            'User' => $userPermissions,
             'Support Staff' => [
                 'view_users',
                 'view_call_logs',

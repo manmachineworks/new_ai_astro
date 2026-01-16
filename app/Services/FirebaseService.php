@@ -12,6 +12,23 @@ class FirebaseService
 
     public function __construct()
     {
+        $credentialsJson = config('firebase.credentials_json');
+        if ($credentialsJson) {
+            $decoded = json_decode($credentialsJson, true);
+            if (!is_array($decoded)) {
+                throw new RuntimeException('FIREBASE_CREDENTIALS_JSON must be valid JSON.');
+            }
+
+            try {
+                $this->auth = (new Factory())
+                    ->withServiceAccount($decoded)
+                    ->createAuth();
+                return;
+            } catch (\Throwable $e) {
+                throw new RuntimeException('Invalid Firebase credentials JSON: '.$e->getMessage(), 0, $e);
+            }
+        }
+
         $envPath = env('FIREBASE_CREDENTIALS');
         if (!$envPath) {
             throw new RuntimeException('FIREBASE_CREDENTIALS is not set. Add it to your .env file.');
