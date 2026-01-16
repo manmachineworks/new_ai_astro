@@ -16,8 +16,23 @@ class AdminAuthenticate
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check()) {
+        $user = $request->user();
+        if (!$user) {
             return redirect()->route('admin.login');
+        }
+
+        if (!$user->hasAnyRole(['Super Admin', 'Admin'])) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('admin.login')->withErrors(['login' => 'Admin access required.']);
+        }
+
+        if ($user->is_active === false) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('admin.login')->withErrors(['login' => 'Your account is inactive.']);
         }
 
         return $next($request);

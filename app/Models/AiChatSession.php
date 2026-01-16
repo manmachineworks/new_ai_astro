@@ -2,39 +2,43 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class AiChatSession extends Model
 {
+    use HasFactory, HasUuids;
+
     protected $fillable = [
         'user_id',
-        'astrologer_user_id',
+        'pricing_mode',
+        'price_per_message',
+        'session_price',
         'status',
-        'per_chat_price',
-        'total_cost',
-        'meta',
+        'started_at',
+        'ended_at',
+        'total_messages',
+        'total_charged',
     ];
 
     protected $casts = [
-        'per_chat_price' => 'integer',
-        'total_cost' => 'integer',
-        'meta' => 'array',
+        'started_at' => 'datetime',
+        'ended_at' => 'datetime',
     ];
 
-    public function user(): BelongsTo
+    public function user()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class);
     }
 
-    public function astrologer(): BelongsTo
+    public function messages()
     {
-        return $this->belongsTo(User::class, 'astrologer_user_id');
+        return $this->hasMany(AiChatMessage::class);
     }
 
-    public function messages(): HasMany
+    public function charges()
     {
-        return $this->hasMany(AiChatMessage::class, 'session_id');
+        return $this->hasMany(AiMessageCharge::class);
     }
 }

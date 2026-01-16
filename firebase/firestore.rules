@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is participant
+    function isParticipant(conversationData) {
+      return request.auth != null && 
+             (conversationData.participants[request.auth.uid] == true);
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if isParticipant(resource.data);
+      // Only Laravel can create conversations (via Service Account)
+      allow create: if false; 
+      // Onlyparticipants can update limited fields (status, typing, receipts)
+      allow update: if isParticipant(resource.data);
+      
+      match /messages/{messageId} {
+        allow read: if isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data);
+        // Only allow senders to write their own messages
+        allow create: if isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data) &&
+                      request.resource.data.senderKey == request.auth.uid;
+        allow update: if isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data) &&
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'deliveredTo']));
+      }
+    }
+
+    match /presence/{participantKey} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == participantKey;
+    }
+
+    match /typing/{conversationId} {
+      allow read, write: if request.auth != null && 
+                            isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data);
+    }
+  }
+}

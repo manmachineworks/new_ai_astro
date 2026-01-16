@@ -1,37 +1,33 @@
 <?php
 
-use App\Http\Controllers\Admin\AdminAuthController;
-use App\Http\Controllers\Admin\AdminUserController;
-use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\PermissionController;
-use App\Http\Controllers\Admin\RoleController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\PricingSettingsController;
+use App\Http\Controllers\Admin\AdminAstrologerController;
+use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\CallController;
 
-Route::prefix('admin')->name('admin.')->group(function () {
-    Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');
-    Route::post('login', [AdminAuthController::class, 'login'])->name('login.submit');
-    Route::post('logout', [AdminAuthController::class, 'logout'])->name('logout');
-});
-
-Route::middleware(['admin.auth', 'role:Super Admin|Admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'role:Admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::middleware('permission:manage_roles_permissions')->group(function () {
-        Route::get('roles', [RoleController::class, 'index'])->name('roles.index');
-        Route::post('roles', [RoleController::class, 'store'])->name('roles.store');
-        Route::get('roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
-        Route::put('roles/{role}', [RoleController::class, 'update'])->name('roles.update');
-        Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+    // Payments Audit
+    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+    Route::get('/payments/{id}', [PaymentController::class, 'show'])->name('payments.show');
 
-        Route::get('permissions', [PermissionController::class, 'index'])->name('permissions.index');
-        Route::post('permissions', [PermissionController::class, 'store'])->name('permissions.store');
-        Route::delete('permissions/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
-    });
-
+    // Astrologer Management
     Route::middleware('permission:view_users')->group(function () {
-        Route::get('users', [AdminUserController::class, 'index'])->name('users.index');
-        Route::get('users/{user}/edit', [AdminUserController::class, 'edit'])->name('users.edit');
-        Route::put('users/{user}', [AdminUserController::class, 'update'])->name('users.update');
-        Route::patch('users/{user}/toggle', [AdminUserController::class, 'toggle'])->name('users.toggle');
+        Route::get('/astrologers', [AdminAstrologerController::class, 'index'])->name('astrologers.index');
+        Route::get('/astrologers/{id}', [AdminAstrologerController::class, 'show'])->name('astrologers.show');
+        Route::put('/astrologers/{id}/verify', [AdminAstrologerController::class, 'verify'])->name('astrologers.verify');
+        Route::put('/astrologers/{id}/toggle-visibility', [AdminAstrologerController::class, 'toggleVisibility'])->name('astrologers.toggleVisibility');
+        Route::put('/astrologers/{id}/toggle-account', [AdminAstrologerController::class, 'toggleAccount'])->name('astrologers.toggleAccount');
+
+        // Calls Audit
+        Route::get('/calls', [CallController::class, 'index'])->name('calls.index');
+        Route::get('/calls/{id}', [CallController::class, 'show'])->name('calls.show');
     });
+
+    // Pricing Settings
+    Route::get('/pricing', [PricingSettingsController::class, 'index'])->name('pricing.index');
+    Route::post('/pricing', [PricingSettingsController::class, 'update'])->name('pricing.update');
 });

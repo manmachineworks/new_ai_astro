@@ -18,6 +18,21 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    'callerdesk' => [
+        'api_key' => env('CALLERDESK_KEY'),
+        'route' => env('CALLERDESK_ROUTE', 'inform'), // click2call or inform
+        'url' => env('CALLERDESK_URL', 'https://api.callerdesk.io/v1'),
+    ],
+
+    'phonepe' => [
+        'merchant_id' => env('PHONEPE_MERCHANT_ID', 'MERCHANTID'),
+        'salt_key' => env('PHONEPE_SALT_KEY', 'salt-key'),
+        'salt_index' => env('PHONEPE_SALT_INDEX', 1),
+        'env' => env('PHONEPE_ENV', 'UAT'), // UAT or PROD
+        'redirect_url' => env('APP_URL') . '/api/payment/redirect',
+        'callback_url' => env('APP_URL') . '/api/webhooks/phonepe',
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
@@ -35,4 +50,9 @@ return [
         ],
     ],
 
+    'astrology_api' => [
+        'base_url' => env('ASTROLOGY_API_URL', 'https://json.astrologyapi.com/v1'),
+        'user_id' => env('ASTROLOGY_API_USER_ID'),
+        'api_key' => env('ASTROLOGY_API_KEY'),
+    ],
 ];

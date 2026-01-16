@@ -2,73 +2,70 @@
 
 namespace App\Services;
 
-use Kreait\Firebase\Auth;
 use Kreait\Firebase\Factory;
-use RuntimeException;
+use Kreait\Firebase\Messaging\CloudMessage;
+use Kreait\Firebase\Messaging\Notification;
+use Illuminate\Support\Facades\Log;
 
 class FirebaseService
 {
-    private Auth $auth;
+    protected $auth;
+    protected $messaging;
+    protected $storage;
 
     public function __construct()
     {
-        $credentialsJson = config('firebase.credentials_json');
-        if ($credentialsJson) {
-            $decoded = json_decode($credentialsJson, true);
-            if (!is_array($decoded)) {
-                throw new RuntimeException('FIREBASE_CREDENTIALS_JSON must be valid JSON.');
-            }
+        $factory = (new Factory)
+            ->withServiceAccount([
+                'project_id' => config('firebase.project_id'),
+                'client_email' => config('firebase.client_email'),
+                'private_key' => config('firebase.private_key'),
+            ])
+            ->withDefaultStorageBucket(config('firebase.storage_bucket'));
 
-            try {
-                $this->auth = (new Factory())
-                    ->withServiceAccount($decoded)
-                    ->createAuth();
-                return;
-            } catch (\Throwable $e) {
-                throw new RuntimeException('Invalid Firebase credentials JSON: '.$e->getMessage(), 0, $e);
-            }
-        }
+        $this->auth = $factory->createAuth();
+        $this->messaging = $factory->createMessaging();
+        $this->storage = $factory->createStorage();
+    }
 
-        $envPath = env('FIREBASE_CREDENTIALS');
-        if (!$envPath) {
-            throw new RuntimeException('FIREBASE_CREDENTIALS is not set. Add it to your .env file.');
-        }
+    /**
+     * Create a custom Firebase token for a Laravel user
+     */
+    public function createCustomToken(string $uid, array $claims = []): string
+    {
+        return (string) $this->auth->createCustomToken($uid, $claims);
+    }
 
-        $credentialsPath = storage_path($envPath);
-        if (!file_exists($credentialsPath)) {
-            // Normalize "storage/..." env values to avoid double "storage/storage" paths.
-            $credentialsPath = storage_path($this->normalizePath($envPath));
-        }
-
-        if (!file_exists($credentialsPath)) {
-            throw new RuntimeException("Firebase credentials file not found: {$credentialsPath}");
-        }
-
-        if (!is_readable($credentialsPath)) {
-            throw new RuntimeException("Firebase credentials file is not readable: {$credentialsPath}");
-        }
-
+    /**
+     * Send Push Notification via FCM
+     */
+    public function sendNotification(string $token, string $title, string $body, array $data = [])
+    {
         try {
-            $this->auth = (new Factory())
-                ->withServiceAccount($credentialsPath)
-                ->createAuth();
-        } catch (\Throwable $e) {
-            throw new RuntimeException('Invalid Firebase credentials: '.$e->getMessage(), 0, $e);
+            $message = CloudMessage::withTarget('token', $token)
+                ->withNotification(Notification::create($title, $body))
+                ->withData($data);
+
+            $this->messaging->send($message);
+            return true;
+        } catch (\Exception $e) {
+            Log::error('FCM Notification failed', ['error' => $e->getMessage()]);
+            return false;
         }
     }
 
-    public function auth(): Auth
+    /**
+     * Get Public URL for a storage object (for attachments)
+     */
+    public function getPublicUrl(string $path): string
     {
-        return $this->auth;
-    }
+        $bucket = $this->storage->getBucket();
+        $object = $bucket->object($path);
 
-    private function normalizePath(string $path): string
-    {
-        $clean = ltrim($path, "\\/");
-        if (str_starts_with($clean, 'storage/')) {
-            $clean = substr($clean, strlen('storage/'));
+        if ($object->exists()) {
+            return $object->signedUrl(now()->addDays(7));
         }
 
-        return $clean;
+        return '';
     }
 }

@@ -2,26 +2,24 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class AiChatMessage extends Model
 {
+    use HasFactory, HasUuids;
+
     protected $fillable = [
-        'session_id',
+        'ai_chat_session_id',
         'role',
         'content',
-        'tokens',
-        'meta',
+        'provider_message_id',
+        'tokens_used',
     ];
 
-    protected $casts = [
-        'tokens' => 'integer',
-        'meta' => 'array',
-    ];
-
-    public function session(): BelongsTo
+    public function session()
     {
-        return $this->belongsTo(AiChatSession::class, 'session_id');
+        return $this->belongsTo(AiChatSession::class, 'ai_chat_session_id');
     }
 }

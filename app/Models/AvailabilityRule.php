@@ -3,25 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AvailabilityRule extends Model
 {
     protected $fillable = [
-        'astrologer_user_id',
-        'weekday',
-        'start_time',
-        'end_time',
-        'slot_minutes',
-        'is_active',
+        'astrologer_profile_id',
+        'day_of_week',
+        'start_time_utc',
+        'end_time_utc',
+        'is_active'
     ];
 
-    protected $casts = [
-        'is_active' => 'boolean',
-    ];
-
-    public function astrologer(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'astrologer_user_id');
-    }
+    // Explicitly define time fields if needed, but string format H:i:s usually works fine.
 }

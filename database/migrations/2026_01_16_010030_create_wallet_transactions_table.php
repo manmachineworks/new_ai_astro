@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -14,16 +13,16 @@ return new class extends Migration
         Schema::create('wallet_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('type', 20);
-            $table->unsignedBigInteger('amount');
-            $table->string('status', 20)->default('pending');
-            $table->string('reference_type', 100)->nullable();
+            $table->decimal('amount', 12, 2);
+            $table->string('type', 10); // credit, debit
+            $table->decimal('balance_after', 12, 2);
+            $table->string('reference_type', 100)->nullable(); // e.g., 'recharge', 'call', 'chat'
             $table->string('reference_id', 100)->nullable();
+            $table->string('description')->nullable();
             $table->json('meta')->nullable();
             $table->timestamps();
 
             $table->index(['user_id', 'created_at']);
-            $table->index(['reference_type', 'reference_id']);
         });
     }
 

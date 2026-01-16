@@ -1,0 +1,46 @@
+/* Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500&display=swap');
+
+:root {
+    /* Cosmic Palette */
+    --color-bg-dark: #0f0c29;
+    --color-bg-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    
+    --color-primary: #FFD700; /* Gold */
+    --color-primary-hover: #E5C100;
+    
+    --color-card-bg: rgba(255, 255, 255, 0.05); /* Glass */
+    --color-card-border: rgba(255, 255, 255, 0.1);
+    
+    --color-text-main: #FFFFFF;
+    --color-text-muted: #B0B0D0;
+    
+    --color-accent: #9D50BB;
+    --color-success: #00E676;
+    --color-danger: #FF5252;
+
+    /* Spacing */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+
+    /* Typography */
+    --font-heading: 'Outfit', sans-serif;
+    --font-body: 'Inter', sans-serif;
+}
+
+body {
+    background: var(--color-bg-gradient);
+    background-attachment: fixed;
+    color: var(--color-text-main);
+    font-family: var(--font-body);
+    margin: 0;
+    min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--color-text-main);
+}

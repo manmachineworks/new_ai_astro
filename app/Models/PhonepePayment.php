@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PhonepePayment extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'merchant_txn_id',
@@ -18,12 +20,12 @@ class PhonepePayment extends Model
     ];
 
     protected $casts = [
-        'amount' => 'integer',
+        'amount' => 'decimal:2',
         'request_payload' => 'array',
         'response_payload' => 'array',
     ];
 
-    public function user(): BelongsTo
+    public function user()
     {
         return $this->belongsTo(User::class);
     }

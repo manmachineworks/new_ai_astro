@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -23,8 +22,8 @@ return new class extends Migration
             $table->boolean('is_call_enabled')->default(false);
             $table->boolean('is_sms_enabled')->default(false);
             $table->boolean('is_chat_enabled')->default(false);
-            $table->unsignedBigInteger('call_per_minute')->default(0);
-            $table->unsignedBigInteger('chat_per_session')->default(0);
+            $table->decimal('call_per_minute', 8, 2)->default(0);
+            $table->decimal('chat_per_session', 8, 2)->default(0);
             $table->json('profile_fields')->nullable();
             $table->text('admin_notes')->nullable();
             $table->timestamps();

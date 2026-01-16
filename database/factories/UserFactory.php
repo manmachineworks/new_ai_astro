@@ -3,6 +3,8 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
@@ -21,12 +23,17 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
-        $phone = '+1'.fake()->unique()->numerify('##########');
-
         return [
             'name' => fake()->name(),
-            'phone' => $phone,
+            'email' => fake()->unique()->safeEmail(),
+            'phone' => fake()->unique()->numerify('##########'),
+            'email_verified_at' => now(),
+            'password' => static::$password ??= Hash::make('password'),
+            'remember_token' => Str::random(10),
+            'wallet_balance' => 0.00,
+            'is_active' => true,
             'firebase_uid' => null,
+            'avatar' => null,
         ];
     }
 }

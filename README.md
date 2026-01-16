@@ -1,115 +1,84 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Astrologer Marketplace (Laravel 11)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A production-ready Astrologer Marketplace web application built with Laravel, featuring Wallet, Realtime Chat (Firebase), Call Logic (CallerDesk), and Role Management.
 
-## Admin Dashboard (Laravel 11/12)
+## Stack
+- **Framework**: Laravel 11 / PHP 8.2+
+- **Database**: MySQL 8.0
+- **Auth**: Laravel Sanctum (API), Spatie Permissions (RBAC)
+- **Realtime**: Firebase Firestore + FCM
+- **Payments**: PhonePe + Internal Wallet Ledger
+- **Telephony**: CallerDesk
 
-Production-ready admin dashboard scaffolding with roles, permissions, activity logging, and reporting widgets.
+## Setup Instructions
 
-### Stack
-- Laravel 11/12
+### 1. Prerequisites
+- PHP 8.2+
 - MySQL
-- Laravel Sanctum
-- Spatie Laravel Permission
-- Blade + Bootstrap
-- Chart.js
-- Laravel Queues & Jobs
+- Composer
+- Node.js & NPM
 
-### Folder Structure
-- `app/Http/Controllers/Admin`
-- `app/Models/AdminActivityLog.php`
-- `app/Policies/UserPolicy.php`
-- `app/Services/AdminActivityLogger.php`
-- `database/migrations/2026_01_15_200000_create_permission_tables.php`
-- `database/migrations/2026_01_15_200100_create_admin_activity_logs_table.php`
-- `database/migrations/2026_01_15_200200_add_admin_fields_to_users_table.php`
-- `database/seeders/RolePermissionSeeder.php`
-- `resources/views/admin`
-- `routes/admin.php`
+### 2. Installation
+1.  Clone the repository.
+2.  Install PHP dependencies:
+    ```bash
+    composer install
+    ```
+3.  Install JS dependencies:
+    ```bash
+    npm install && npm run build
+    ```
+4.  Configure Environment:
+    ```bash
+    cp .env.example .env
+    php artisan key:generate
+    ```
+    Update `.env` with your DB credentials.
 
-### Setup
-1. Install packages:
+### 3. Database Setup
+Run migrations and seeders to set up tables and default roles/users.
 ```bash
-composer require laravel/sanctum spatie/laravel-permission
-php artisan vendor:publish --provider="Laravel\\Sanctum\\SanctumServiceProvider"
-php artisan vendor:publish --provider="Spatie\\Permission\\PermissionServiceProvider"
+php artisan migrate --seed
 ```
-2. Run migrations and seeders:
+This will create:
+- Roles: `Super Admin`, `Admin`, `Astrologer`, `User`
+- Default Admin: `admin@example.com` / `password`
+
+### 4. Running the App
 ```bash
-php artisan migrate
-php artisan db:seed
+php artisan serve
 ```
-3. Configure admin credentials in `.env` (optional):
+
+## API Documentation (Core)
+
+### Authentication
+- `POST /api/login` (Use `sanctum:token` command for testing now)
+
+### Wallet
+- `GET /api/wallet/balance`
+- `GET /api/wallet/transactions`
+- `POST /api/wallet/recharge` (Amount -> PhonePe Redirect)
+
+### Astrologers
+- `GET /api/astrologers?search=name&skill=Vedic`
+- `PUT /api/astrologer/profile` (Update Bio/Pricing)
+- `PUT /api/astrologer/status` (Toggle Online/Offline)
+
+### Services
+- **Call**: `POST /api/call/initiate` (Requires `astrologer_id`)
+- **Chat**: `POST /api/chat/initiate` (Requires `astrologer_id`)
+- **AI**: `POST /api/ai/chat` (Message -> Response)
+
+### Withdrawals
+- `POST /api/withdrawals` (Astrologer requests payout)
+- `GET /api/withdrawals` (Admin list)
+- `PUT /api/withdrawals/{id}` (Admin approve/reject)
+
+## Running Tests
+Run all feature tests to verify system integrity:
+```bash
+php artisan test
 ```
-ADMIN_EMAIL=admin@example.com
-ADMIN_PHONE=9999999999
-ADMIN_PASSWORD=ChangeMe123!
-```
-4. Login with the seeded Super Admin user at `/admin/login`.
 
-### Routes
-- Admin dashboard: `/admin`
-- Roles: `/admin/roles`
-- Permissions: `/admin/permissions`
-- Users: `/admin/users`
-
-### Security Notes
-- Role/permission checks enforced in `routes/admin.php`.
-- Policy checks enforced in `app/Http/Controllers/Admin/AdminUserController.php`.
-- Admin actions logged via `app/Services/AdminActivityLogger.php`.
-
-## About Laravel
-
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
-
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Architecture
+See `brain/design.md` for detailed Schema and Architecture.

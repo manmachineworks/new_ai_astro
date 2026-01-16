@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -16,7 +15,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('merchant_txn_id', 191)->unique();
             $table->string('phonepe_txn_id', 191)->nullable();
-            $table->unsignedBigInteger('amount');
+            $table->decimal('amount', 12, 2);
             $table->string('status', 20)->default('initiated');
             $table->json('request_payload')->nullable();
             $table->json('response_payload')->nullable();
