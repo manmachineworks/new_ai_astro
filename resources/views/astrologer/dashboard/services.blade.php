@@ -1,88 +1,89 @@
-@extends('layouts.app')
+@extends('layouts.astrologer')
 
 @section('title', 'Services & Pricing')
+@section('page-title', 'Services & Pricing')
 
 @section('content')
-<div class="container py-4">
-    <div class="row">
-        <div class="col-md-3">
-            @include('astrologer.dashboard.nav')
-        </div>
-        <div class="col-md-9">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Services & Pricing</h5>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            @if(!$profile->is_verified)
+                <div class="alert alert-warning border-0 shadow-sm rounded-3 mb-4">
+                    <i class="fas fa-lock me-2"></i> Your profile is not verified yet. Services will be hidden from the public
+                    until verified.
                 </div>
-                <div class="card-body">
-                    @if(session('success'))
-                        <div class="alert alert-success">{{ session('success') }}</div>
-                    @endif
-                    
-                    @if(!$profile->is_verified)
-                         <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle me-2"></i> 
-                            You cannot enable services until your profile is verified by admin.
-                        </div>
-                    @endif
+            @endif
 
-                    <form action="{{ route('astrologer.services.update') }}" method="POST">
-                        @csrf
-                        
-                        <!-- Call Service -->
-                        <div class="card mb-4 border-light bg-light">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="fw-bold m-0"><i class="fas fa-phone-alt me-2"></i> Audio Call</h6>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="is_call_enabled" value="1" 
-                                            {{ $profile->is_call_enabled ? 'checked' : '' }}
-                                            {{ !$profile->is_verified ? 'disabled' : '' }}>
-                                        <label class="form-check-label">Enable</label>
-                                    </div>
+            <form action="{{ route('astrologer.services.update') }}" method="POST">
+                @csrf
+
+                <!-- Call Service -->
+                <div class="card card-premium mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle bg-info-subtle p-3 text-info">
+                                    <i class="fas fa-phone-alt fa-lg"></i>
                                 </div>
-                                <div class="row align-items-center">
-                                    <div class="col-md-6">
-                                        <label class="form-label small text-muted">Price per Minute (INR)</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">₹</span>
-                                            <input type="number" name="call_per_minute" class="form-control" value="{{ (int)$profile->call_per_minute }}" min="1">
-                                        </div>
-                                    </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">Audio/Video Calls</h5>
+                                    <div class="small text-muted">Earn per minute of conversation</div>
                                 </div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_call_enabled"
+                                    style="width: 3em; height: 1.5em;" {{ $profile->is_call_enabled ? 'checked' : '' }} {{ !$profile->is_verified ? 'disabled' : '' }}>
                             </div>
                         </div>
 
-                        <!-- Chat Service -->
-                        <div class="card mb-4 border-light bg-light">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="fw-bold m-0"><i class="fas fa-comment-dots me-2"></i> Chat Session</h6>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="is_chat_enabled" value="1" 
-                                            {{ $profile->is_chat_enabled ? 'checked' : '' }}
-                                            {{ !$profile->is_verified ? 'disabled' : '' }}>
-                                        <label class="form-check-label">Enable</label>
-                                    </div>
+                        <div class="bg-light rounded-3 p-3">
+                            <label class="form-label small fw-bold text-muted">Rate per Minute (₹)</label>
+                            <div class="input-group">
+                                <span class="input-group-text border-0 bg-white fw-bold">₹</span>
+                                <input type="number" name="call_per_minute" class="form-control border-0 bg-white"
+                                    value="{{ $profile->call_per_minute }}" min="0" step="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Service -->
+                <div class="card card-premium mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle bg-success-subtle p-3 text-success">
+                                    <i class="fas fa-comments fa-lg"></i>
                                 </div>
-                                <div class="row align-items-center">
-                                    <div class="col-md-6">
-                                        <label class="form-label small text-muted">Price per Session/Min (INR)</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">₹</span>
-                                            <input type="number" name="chat_per_session" class="form-control" value="{{ (int)$profile->chat_per_session }}" min="1">
-                                        </div>
-                                    </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">Live Chat</h5>
+                                    <div class="small text-muted">Earn per message or session</div>
                                 </div>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_chat_enabled"
+                                    style="width: 3em; height: 1.5em;" {{ $profile->is_chat_enabled ? 'checked' : '' }} {{ !$profile->is_verified ? 'disabled' : '' }}>
                             </div>
                         </div>
 
-                        <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                        <div class="bg-light rounded-3 p-3">
+                            <label class="form-label small fw-bold text-muted">Rate per Session/Message (₹)</label>
+                            <div class="input-group">
+                                <span class="input-group-text border-0 bg-white fw-bold">₹</span>
+                                <input type="number" name="chat_per_session" class="form-control border-0 bg-white"
+                                    value="{{ $profile->chat_per_session ?? 0 }}" min="0" step="1">
+                            </div>
+                            <div class="form-text mt-2 small">Pricing model: Flat rate per chat session initialization.
+                            </div>
                         </div>
-                    </form>
+                    </div>
                 </div>
-            </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary px-5 rounded-pill shadow-sm">
+                        Update Services
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
-</div>
 @endsection

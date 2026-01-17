@@ -1,175 +1,191 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Astrologer Details')
+@section('title', 'Astrologer Profile: ' . ($astrologer->astrologerProfile->display_name ?? $astrologer->name))
+@section('page_title', 'Astrologer Detail')
 
 @section('content')
     <div class="row">
+        <!-- Sidebar -->
         <div class="col-md-4">
             <div class="card shadow-sm mb-4">
                 <div class="card-body text-center">
-                    <div class="mb-3">
-                        <span
-                            class="avatar-circle bg-primary text-white fs-3 mx-auto d-flex align-items-center justify-content-center"
-                            style="width: 80px; height: 80px;">
-                            {{ substr($astrologer->astrologerProfile->display_name ?? $astrologer->name, 0, 1) }}
-                        </span>
+                    @php $profile = $astrologer->astrologerProfile; @endphp
+
+                    <div class="avatar-circle mx-auto bg-primary text-white d-flex align-items-center justify-content-center mb-3"
+                        style="width: 100px; height: 100px; border-radius: 50%; background-image: url('{{ $profile->profile_photo_path ? asset($profile->profile_photo_path) : '' }}'); background-size: cover;">
+                        {{ !$profile->profile_photo_path ? strtoupper(substr($profile->display_name ?? $astrologer->name, 0, 1)) : '' }}
                     </div>
-                    <h5 class="fw-bold">{{ $astrologer->astrologerProfile->display_name ?? $astrologer->name }}</h5>
-                    <p class="text-muted small">{{ $astrologer->email }}</p>
+
+                    <h4>{{ $profile->display_name ?? $astrologer->name }}</h4>
+                    <p class="text-muted">{{ $astrologer->email }}</p>
+
+                    <div
+                        class="alert alert-{{ $profile->verification_status == 'approved' ? 'success' : ($profile->verification_status == 'pending' ? 'warning' : 'danger') }} mb-3">
+                        <strong>Status: {{ ucfirst($profile->verification_status) }}</strong>
+                    </div>
+
+                    @if($profile->verification_status == 'pending')
+                        <div class="d-grid gap-2 mb-3">
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveModal">Approve
+                                Astrologer</button>
+                            <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">Reject
+                                Application</button>
+                        </div>
+                    @endif
 
                     <hr>
 
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Status</span>
-                        @if($astrologer->astrologerProfile->is_verified)
-                            <span class="badge bg-success">Verified</span>
-                        @else
-                            <span
-                                class="badge bg-warning text-dark">{{ ucfirst($astrologer->astrologerProfile->verification_status) }}</span>
-                        @endif
+                        <span class="text-muted">Experience</span>
+                        <span>{{ $profile->experience_years }} Years</span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Frontend</span>
-                        @if($astrologer->astrologerProfile->show_on_front)
-                            <span class="badge bg-primary">Visible</span>
-                        @else
-                            <span class="badge bg-light text-secondary border">Hidden</span>
-                        @endif
+                        <span class="text-muted">Wallet Balance</span>
+                        <span class="fw-bold">{{ number_format($astrologer->wallet_balance, 2) }}</span>
                     </div>
 
-                    <div class="mt-4">
-                        <!-- Toggle Account -->
-                        <form action="{{ route('admin.astrologers.toggleAccount', $astrologer->id) }}" method="POST"
-                            class="d-inline">
-                            @csrf
-                            @method('PUT')
-                            @if($astrologer->astrologerProfile->is_enabled)
-                                <button class="btn btn-outline-danger btn-sm w-100 mb-2">Disable Account</button>
-                            @else
-                                <button class="btn btn-outline-success btn-sm w-100 mb-2">Enable Account</button>
-                            @endif
-                        </form>
+                    <hr>
 
-                        <!-- Toggle Visibility -->
-                        <form action="{{ route('admin.astrologers.toggleVisibility', $astrologer->id) }}" method="POST"
-                            class="d-inline">
-                            @csrf
-                            @method('PUT')
-                            @if($astrologer->astrologerProfile->show_on_front)
-                                <button class="btn btn-outline-secondary btn-sm w-100">Hide from Frontend</button>
-                            @else
-                                <button class="btn btn-outline-primary btn-sm w-100">Show on Frontend</button>
-                            @endif
-                        </form>
-                    </div>
+                    <form action="{{ route('admin.astrologers.toggleAccount', $astrologer->id) }}" method="POST"
+                        class="d-grid mb-2">
+                        @csrf
+                        @method('PUT')
+                        <button
+                            class="btn btn-outline-secondary">{{ $profile->is_enabled ? 'Disable Account' : 'Enable Account' }}</button>
+                    </form>
                 </div>
             </div>
         </div>
 
+        <!-- Main Content -->
         <div class="col-md-8">
-            <!-- Verification Actions -->
-            @if(!$astrologer->astrologerProfile->is_verified)
-                <div class="card shadow-sm border-warning mb-4">
-                    <div class="card-header bg-warning text-dark fw-bold">
-                        Verification Required
-                    </div>
-                    <div class="card-body">
-                        <form action="{{ route('admin.astrologers.verify', $astrologer->id) }}" method="POST">
-                            @csrf
-                            @method('PUT')
-
-                            <div class="mb-3">
-                                <label class="form-label">Review Actions</label>
-                                <div class="d-flex gap-2">
-                                    <button type="submit" name="status" value="approved" class="btn btn-success">
-                                        <i class="fas fa-check me-1"></i> Approve & Verify
-                                    </button>
-                                    <button type="button" class="btn btn-danger"
-                                        onclick="document.getElementById('rejectSection').classList.remove('d-none')">
-                                        <i class="fas fa-times me-1"></i> Reject
-                                    </button>
-                                </div>
+            <!-- Profile Details -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">Profile Details</div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="small text-muted">Specialties</label>
+                            <div>
+                                @if($profile->specialties)
+                                    @foreach($profile->specialties as $spec)
+                                        <span class="badge bg-light text-dark border">{{ $spec }}</span>
+                                    @endforeach
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
                             </div>
-
-                            <div id="rejectSection" class="d-none mt-3">
-                                <label class="form-label">Rejection Reason</label>
-                                <textarea name="rejection_reason" class="form-control mb-2" rows="2"
-                                    placeholder="Explain why..."></textarea>
-                                <button type="submit" name="status" value="rejected" class="btn btn-danger btn-sm">Confirm
-                                    Rejection</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            @endif
-
-            <!-- Details Tabs -->
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <ul class="nav nav-tabs card-header-tabs">
-                        <li class="nav-item">
-                            <a class="nav-link active" data-bs-toggle="tab" href="#about">About</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#docs">Documents</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#schedule">Availability</a>
-                        </li>
-                    </ul>
-                </div>
-                <div class="card-body tab-content">
-                    <div class="tab-pane fade show active" id="about">
-                        <h6 class="fw-bold">Bio</h6>
-                        <p class="text-muted">{{ $astrologer->astrologerProfile->bio }}</p>
-
-                        <div class="row mt-3">
-                            <div class="col-md-6">
-                                <h6 class="fw-bold">Languages</h6>
-                                <p>{{ implode(', ', $astrologer->astrologerProfile->languages ?? []) }}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <h6 class="fw-bold">Skills</h6>
-                                <p>{{ implode(', ', $astrologer->astrologerProfile->skills ?? []) }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small text-muted">Languages</label>
+                            <div>
+                                @if($profile->languages)
+                                    @foreach($profile->languages as $lang)
+                                        <span class="badge bg-light text-dark border">{{ $lang }}</span>
+                                    @endforeach
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
                             </div>
                         </div>
                     </div>
-
-                    <div class="tab-pane fade" id="docs">
-                        <h6 class="fw-bold mb-3">Submitted Documents</h6>
-                        @forelse($astrologer->astrologerProfile->documents as $doc)
-                            <div class="d-flex align-items-center justify-content-between border p-2 rounded mb-2">
-                                <div>
-                                    <div class="fw-medium">{{ ucfirst(str_replace('_', ' ', $doc->doc_type)) }}</div>
-                                    <div class="small text-muted">{{ $doc->created_at->format('M d, Y') }}</div>
-                                </div>
-                                <div>
-                                    <a href="#" class="btn btn-sm btn-outline-primary" target="_blank">View</a>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="text-muted fst-italic">No documents uploaded.</div>
-                        @endforelse
-                    </div>
-
-                    <div class="tab-pane fade" id="schedule">
-                        <h6 class="fw-bold mb-3">Weekly Schedule (UTC)</h6>
-                        <ul class="list-group list-group-flush">
-                            @forelse($astrologer->astrologerProfile->availabilityRules as $rule)
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span>{{ ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][$rule->day_of_week] }}</span>
-                                    <span class="badge bg-light text-dark border">
-                                        {{ \Carbon\Carbon::parse($rule->start_time_utc)->format('H:i') }} -
-                                        {{ \Carbon\Carbon::parse($rule->end_time_utc)->format('H:i') }}
-                                    </span>
-                                </li>
-                            @empty
-                                <li class="list-group-item text-muted">No active schedule.</li>
-                            @endforelse
-                        </ul>
+                    <div class="mb-3">
+                        <label class="small text-muted">Bio</label>
+                        <p class="mb-0">{{ $profile->bio }}</p>
                     </div>
                 </div>
             </div>
+
+            <!-- Documents -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">Verification Documents</div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($profile->documents as $doc)
+                                <tr>
+                                    <td>{{ ucfirst(str_replace('_', ' ', $doc->doc_type)) }}</td>
+                                    <td>
+                                        <span
+                                            class="badge bg-{{ $doc->status == 'approved' ? 'success' : 'secondary' }}">{{ ucfirst($doc->status) }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm btn-outline-primary"
+                                            onclick="alert('Document preview implementation pending storage setup')">View</a>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">No documents uploaded.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Approve Modal -->
+    <div class="modal fade" id="approveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form action="{{ route('admin.astrologers.verify', $astrologer->id) }}" method="POST">
+                @csrf
+                @method('PUT')
+                <input type="hidden" name="status" value="approved">
+
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Approve Astrologer</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to approve <strong>{{ $profile->display_name }}</strong>?</p>
+                        <p class="text-muted small">This will mark them as verified and allow them to take calls/chats if
+                            enabled.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">Approve</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reject Modal -->
+    <div class="modal fade" id="rejectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form action="{{ route('admin.astrologers.verify', $astrologer->id) }}" method="POST">
+                @csrf
+                @method('PUT')
+                <input type="hidden" name="status" value="rejected">
+
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Reject Application</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Rejection Reason <span class="text-danger">*</span></label>
+                            <textarea name="rejection_reason" class="form-control" rows="3" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Reject</button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 @endsection

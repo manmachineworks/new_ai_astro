@@ -20,6 +20,7 @@ class DailyMetric extends Model
         'wallet_recharge_success',
         'wallet_recharge_count_success',
         'wallet_recharge_count_failed',
+        'refunds_amount',
         'new_users',
         'active_users',
     ];
@@ -36,5 +37,6 @@ class DailyMetric extends Model
         'ai_commission' => 'decimal:2',
         'ai_earnings' => 'decimal:2',
         'wallet_recharge_success' => 'decimal:2',
+        'refunds_amount' => 'decimal:2',
     ];
 }

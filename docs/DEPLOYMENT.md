@@ -1,389 +1,157 @@
-# Production Deployment Guide
+# Deployment Guide
 
-## Prerequisites
+This guide outlines the steps to deploy the Astrologer Marketplace application to a production environment (e.g., DigitalOcean, AWS EC2, or a VPS).
 
-- PHP 8.2+
-- MySQL 8.0+ / MariaDB 10.3+
-- Redis 6.0+
-- Nginx 1.18+ / Apache 2.4+
-- Composer 2.x
-- Node.js 18+ (for asset compilation)
-- Supervisor (for queue workers)
+## 1. Server Requirements
+*   **OS**: Ubuntu 22.04 LTS (Recommended)
+*   **Web Server**: Nginx or Apache
+*   **PHP**: 8.2 or 8.3
+*   **Extensions**: `bcmath`, `ctype`, `fileinfo`, `json`, `mbstring`, `openssl`, `pdo`, `tokenizer`, `xml`, `curl`
+*   **Database**: MySQL 8.0 or MariaDB 10.6
+*   **Composer**: Latest version
+*   **Node.js**: v18+ (for frontend assets)
 
----
+## 2. Environment Setup
 
-## 1. Server Setup
-
-### Install Dependencies
-
+### Clone Repository
 ```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install -y php8.2-fpm php8.2-mysql php8.2-redis php8.2-mbstring \
-    php8.2-xml php8.2-bcmath php8.2-curl php8.2-zip php8.2-gd \
-    nginx mysql-server redis-server supervisor composer git
-
-# Enable PHP-FPM
-sudo systemctl enable php8.2-fpm
-sudo systemctl start php8.2-fpm
+git clone https://github.com/your-repo/new_ai_astro.git
+cd new_ai_astro
 ```
 
----
-
-## 2. Application Deployment
-
-### Clone & Install
-
+### Install Dependencies
 ```bash
-cd /var/www
-sudo git clone <repository-url> new_ai_astro
-cd new_ai_astro
-
-# Install dependencies
-composer install --no-dev --optimize-autoloader
-npm install && npm run build
-
-# Set permissions
-sudo chown -R www-data:www-data storage bootstrap/cache
-sudo chmod -R 775 storage bootstrap/cache
+composer install --optimize-autoloader --no-dev
+npm install
+npm run build
 ```
 
 ### Environment Configuration
-
-```bash
-# Copy and edit .env
-cp .env.example .env
-php artisan key:generate
-
-# Edit .env with production values
-nano .env
-```
-
-**Critical `.env` Settings:**
+Copy `.env.example` to `.env` and update the following:
 
 ```env
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://yourdomain.com
+APP_URL=https://your-domain.com
 
-DB_HOST=localhost
-DB_DATABASE=astro_prod
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_DATABASE=astro_db
 DB_USERNAME=astro_user
-DB_PASSWORD=<strong-password>
+DB_PASSWORD=secure_password
 
-REDIS_HOST=localhost
-REDIS_PASSWORD=null
-REDIS_PORT=6379
+# PhonePe (Production Credentials)
+PHONEPE_ENV=PROD
+PHONEPE_MERCHANT_ID=...
+PHONEPE_SALT_KEY=...
 
-QUEUE_CONNECTION=redis
-
-PHONEPE_MERCHANT_ID=<your-merchant-id>
-PHONEPE_SALT_KEY=<your-salt-key>
-PHONEPE_SALT_INDEX=<your-salt-index>
-
-FIREBASE_CREDENTIALS=/var/www/new_ai_astro/firebase-credentials.json
-
-ASTROLOGYAPI_USER_ID=<your-user-id>
-ASTROLOGYAPI_API_KEY=<your-api-key>
+# Firebase (Production Key)
+FIREBASE_PROJECT_ID=...
+# Ensure the private key is properly formatted with \n
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
 ```
 
-### Firebase Setup
-
+### Key Generation & Storage Link
 ```bash
-# Upload Firebase service account credentials
-sudo nano /var/www/new_ai_astro/firebase-credentials.json
-# Paste JSON content
-
-# Secure the file
-sudo chmod 600 /var/www/new_ai_astro/firebase-credentials.json
-sudo chown www-data:www-data /var/www/new_ai_astro/firebase-credentials.json
+php artisan key:generate
+php artisan storage:link
 ```
 
-### Database Migration
-
+## 3. Database Migration
 ```bash
 php artisan migrate --force
-php artisan db:seed --force  # If needed
 ```
+*Note: Ensure your production database is created and empty before running this.*
 
-### Cache & Optimize
+## 4. Web Server Configuration (Nginx Example)
 
-```bash
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-php artisan event:cache
-```
-
----
-
-## 3. Nginx Configuration
-
-**File:** `/etc/nginx/sites-available/astro`
+Create a configuration file at `/etc/nginx/sites-available/astro`:
 
 ```nginx
 server {
     listen 80;
-    listen [::]:80;
-    server_name yourdomain.com www.yourdomain.com;
-    
-    # Redirect to HTTPS
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
-
+    server_name your-domain.com;
     root /var/www/new_ai_astro/public;
-    index index.php index.html;
 
-    # SSL Configuration (use Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
 
-    # Logging
-    access_log /var/log/nginx/astro-access.log;
-    error_log /var/log/nginx/astro-error.log;
+    index index.php;
 
-    # Security Headers (redundant with SecureHeaders middleware, but good practice)
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    charset utf-8;
 
-    # Laravel specific
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
     location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
-        fastcgi_hide_header X-Powered-By;
     }
 
     location ~ /\.(?!well-known).* {
         deny all;
     }
-
-    # Asset caching
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
 }
 ```
 
-**Enable and Test:**
-
+Enable site and restart Nginx:
 ```bash
-sudo ln -s /etc/nginx/sites-available/astro /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+ln -s /etc/nginx/sites-available/astro /etc/nginx/sites-enabled/
+nginx -t
+systemctl restart nginx
 ```
 
----
+## 5. SSL Certificate (Certbot)
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com
+```
 
-## 4. Supervisor Configuration (Queue Workers)
+## 6. Supervisor (Queue Workers)
+For sending emails and handling webhooks (if queued):
 
-**File:** `/etc/supervisor/conf.d/astro-worker.conf`
+Install Supervisor:
+```bash
+sudo apt install supervisor
+```
 
+Create config `/etc/supervisor/conf.d/astro-worker.conf`:
 ```ini
 [program:astro-worker]
 process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/new_ai_astro/artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+command=php /var/www/new_ai_astro/artisan queue:work sqs --sleep=3 --tries=3
 autostart=true
 autorestart=true
-stopasgroup=true
-killasgroup=true
 user=www-data
-numprocs=4
+numprocs=2
 redirect_stderr=true
 stdout_logfile=/var/www/new_ai_astro/storage/logs/worker.log
 stopwaitsecs=3600
 ```
 
-**Start Workers:**
-
+Start Supervisor:
 ```bash
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl start astro-worker:*
-sudo supervisorctl status
 ```
 
----
+## 7. Scheduler (Cron)
+Add the following to your server's crontab (`crontab -e`):
 
-## 5. Cron Configuration
-
-**Add to crontab (`sudo crontab -e -u www-data`):**
-
-```cron
+```bash
 * * * * * cd /var/www/new_ai_astro && php artisan schedule:run >> /dev/null 2>&1
 ```
+*This is critical for `billing:reconcile` ensuring wallet safety.*
 
-**Scheduled Tasks (in `app/Console/Kernel.php`):**
-
-```php
-protected function schedule(Schedule $schedule)
-{
-    $schedule->command('metrics:daily')->dailyAt('01:00');
-    $schedule->command('queue:prune-failed --hours=48')->daily();
-}
-```
-
----
-
-## 6. SSL Certificate (Let's Encrypt)
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
-sudo certbot renew --dry-run  # Test auto-renewal
-```
-
----
-
-## 7. Firewall Configuration
-
-```bash
-sudo ufw allow 22/tcp   # SSH
-sudo ufw allow 80/tcp   # HTTP
-sudo ufw allow 443/tcp  # HTTPS
-sudo ufw enable
-sudo ufw status
-```
-
----
-
-## 8. Monitoring & Health Checks
-
-### Health Endpoints
-
-- **Basic:** `https://yourdomain.com/health`
-- **Database:** `https://yourdomain.com/health/db`
-- **Queue:** `https://yourdomain.com/health/queue`
-
-### Smoke Test
-
-```bash
-php artisan app:smoke-test
-```
-
----
-
-## 9. Backup Strategy
-
-### Database Backup (Daily)
-
-```bash
-# Add to cron (root user)
-0 2 * * * /usr/bin/mysqldump -u astro_user -p<password> astro_prod | gzip > /backups/db-$(date +\%Y\%m\%d).sql.gz
-```
-
-### File Backup
-
-```bash
-# Backup critical directories
-tar -czf /backups/storage-$(date +%Y%m%d).tar.gz /var/www/new_ai_astro/storage
-```
-
-### Firebase Backup
-
-- **Firestore Exports:** Use Firebase Console or CLI
-- **Security Rules:** Keep `firestore.rules` in version control
-
----
-
-## 10. Post-Deployment Verification
-
-```bash
-# Run smoke test
-php artisan app:smoke-test
-
-# Run test suite
-php artisan test
-
-# Check queue workers
-sudo supervisorctl status
-
-# Check logs
-tail -f storage/logs/laravel.log
-tail -f /var/log/nginx/astro-error.log
-```
-
----
-
-## Rollback Procedure
-
-```bash
-# If deployment fails
-cd /var/www/new_ai_astro
-git checkout <previous-commit-hash>
-composer install --no-dev
-php artisan migrate:rollback  # If needed
-php artisan config:cache
-sudo supervisorctl restart astro-worker:*
-```
-
----
-
-## Troubleshooting
-
-### Issue: 500 Error
-- Check: `storage/logs/laravel.log`
-- Check: `/var/log/nginx/astro-error.log`
-- Verify: Storage permissions (`chmod -R 775 storage bootstrap/cache`)
-
-### Issue: Queue Not Processing
-- Check: `sudo supervisorctl status`
-- Restart: `sudo supervisorctl restart astro-worker:*`
-- Logs: `tail -f storage/logs/worker.log`
-
-### Issue: Database Connection Failed
-- Verify: `.env` credentials
-- Test: `php artisan tinker` then `DB::connection()->getPdo();`
-
-### Issue: Redis Connection Failed
-- Check: `redis-cli ping`
-- Verify: Redis is running (`sudo systemctl status redis`)
-
----
-
-## Security Checklist
-
-- [ ] HTTPS enforced
-- [ ] Firewall configured
-- [ ] `.env` file not publicly accessible
-- [ ] Firebase credentials secured (chmod 600)
-- [ ] Database user has minimal permissions
-- [ ] Fail2ban configured (optional)
-- [ ] Regular security updates applied
-
----
-
-## Maintenance
-
-**Weekly:**
-- Review logs for errors
-- Check disk space
-- Verify backups
-
-**Monthly:**
-- Update dependencies (`composer update`, `npm update`)
-- Security patches (`sudo apt update && sudo apt upgrade`)
-- Database optimization
-
-**Quarterly:**
-- Review performance metrics
-- Optimize indexes
-- Prune old data (logs, webhooks)
-
----
-
-**Support:** For issues, check logs first, then contact dev team.
+## 8. Verifying Production
+1.  **PhonePe**: Test a ₹1 transaction in Production mode.
+2.  **Firebase**: Login and ensure Chat connects.
+3.  **CallerDesk**: Verify the webhook URL is reachable from outside.

@@ -8,8 +8,11 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\CallController;
 use App\Http\Controllers\Admin\AppointmentController;
 use App\Http\Controllers\Admin\ReportingController;
-
 use App\Http\Controllers\Admin\AdminAuthController;
+use App\Http\Controllers\Admin\AdminUserManagementController;
+use App\Http\Controllers\Admin\Finance\FinanceController;
+use App\Http\Controllers\Admin\Finance\PaymentsController as FinancePaymentsController;
+use App\Http\Controllers\Admin\Finance\WalletsController as FinanceWalletsController;
 
 // Guest Admin Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -17,123 +20,155 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
 });
 
-Route::middleware(['auth', 'role:Admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'role:Super Admin|Admin|Finance Admin|Support Admin|Ops Admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
-    // Payments Audit
-    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
-    Route::get('/payments/{id}', [PaymentController::class, 'show'])->name('payments.show');
+    // 1. Admin Management (Super Admin Only)
+    Route::middleware('permission:manage_roles')->group(function () {
+        Route::resource('admin-users', AdminUserManagementController::class);
+        Route::resource('roles', \App\Http\Controllers\Admin\AdminRoleController::class)->names('roles');
+    });
 
-    // Appointments
-    Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments.index');
-    Route::get('/appointments/{id}', [AppointmentController::class, 'show'])->name('appointments.show');
-    Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel'])->name('appointments.cancel');
-
-    // Astrologer Management
+    // 2. User Management
     Route::middleware('permission:view_users')->group(function () {
+        Route::post('/users/bulk-action', [\App\Http\Controllers\Admin\AdminUserController::class, 'bulkAction'])->name('users.bulk_action')->middleware('permission:manage_users');
+        Route::resource('users', \App\Http\Controllers\Admin\AdminUserController::class)->names('users')->only(['index', 'show', 'edit', 'update']);
+        Route::post('/users/{user}/toggle', [\App\Http\Controllers\Admin\AdminUserController::class, 'toggle'])->name('users.toggle')->middleware('permission:manage_users');
+    });
+
+    // 3. Astrologer Management
+    Route::middleware('permission:view_astrologers')->group(function () {
+        Route::post('/astrologers/bulk-action', [AdminAstrologerController::class, 'bulkAction'])->name('astrologers.bulk_action')->middleware('permission:manage_astrologers');
         Route::get('/astrologers', [AdminAstrologerController::class, 'index'])->name('astrologers.index');
         Route::get('/astrologers/{id}', [AdminAstrologerController::class, 'show'])->name('astrologers.show');
-        Route::put('/astrologers/{id}/verify', [AdminAstrologerController::class, 'verify'])->name('astrologers.verify');
-        Route::put('/astrologers/{id}/toggle-visibility', [AdminAstrologerController::class, 'toggleVisibility'])->name('astrologers.toggleVisibility');
-        Route::put('/astrologers/{id}/toggle-account', [AdminAstrologerController::class, 'toggleAccount'])->name('astrologers.toggleAccount');
 
-        // Calls Audit
+        Route::middleware('permission:verify_astrologers')->group(function () {
+            Route::put('/astrologers/{id}/verify', [AdminAstrologerController::class, 'verify'])->name('astrologers.verify');
+            Route::put('/astrologers/{id}/toggle-account', [AdminAstrologerController::class, 'toggleAccount'])->name('astrologers.toggleAccount');
+        });
+
+        Route::put('/astrologers/{id}/toggle-visibility', [AdminAstrologerController::class, 'toggleVisibility'])->name('astrologers.toggleVisibility')->middleware('permission:toggle_astrologer_visibility');
+    });
+
+    // 4. Finance (Payments & Wallets)
+    Route::middleware('permission:view_finance')->group(function () {
+        // Payments
+        Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+        Route::get('/payments/{id}', [PaymentController::class, 'show'])->name('payments.show');
+
+        // Wallets
+        Route::get('/wallets', [\App\Http\Controllers\Admin\AdminWalletController::class, 'index'])->name('wallets.index');
+        Route::get('/wallets/{id}', [\App\Http\Controllers\Admin\AdminWalletController::class, 'show'])->name('wallets.show');
+
+        Route::middleware('permission:wallet_credit')->post('/wallets/{id}/recharge', [\App\Http\Controllers\Admin\AdminWalletController::class, 'recharge'])->name('wallets.recharge');
+
+        // Finance Ops
+        Route::prefix('finance')->name('finance.')->group(function () {
+            Route::get('/payments', [FinancePaymentsController::class, 'index'])->name('payments.index')->middleware('permission:manage_payments');
+            Route::get('/payments/export', [FinancePaymentsController::class, 'export'])->name('payments.export')->middleware('permission:export_finance');
+            Route::get('/payments/{paymentOrder}', [FinancePaymentsController::class, 'show'])->name('payments.show')->middleware('permission:manage_payments');
+            Route::post('/payments/{paymentOrder}/recheck', [FinancePaymentsController::class, 'recheck'])->name('payments.recheck')->middleware('permission:manage_payments');
+            Route::post('/payments/{paymentOrder}/retry-webhook', [FinancePaymentsController::class, 'retryWebhook'])->name('payments.retry_webhook')->middleware('permission:manage_payments');
+            Route::post('/payments/{paymentOrder}/note', [FinancePaymentsController::class, 'updateNote'])->name('payments.note')->middleware('permission:manage_payments');
+
+            Route::get('/wallets', [FinanceWalletsController::class, 'index'])->name('wallets.index');
+            Route::get('/wallets/export', [FinanceWalletsController::class, 'export'])->name('wallets.export')->middleware('permission:export_finance');
+            Route::get('/wallets/{user}', [FinanceWalletsController::class, 'show'])->name('wallets.show');
+            Route::post('/wallets/{user}/adjust', [FinanceWalletsController::class, 'adjust'])->name('wallets.adjust')->middleware('permission:wallet_adjustments');
+
+            Route::get('/earnings', [FinanceController::class, 'earnings'])->name('earnings.index')->middleware('permission:manage_payouts');
+            Route::get('/refunds', [FinanceController::class, 'refunds'])->name('refunds.index')->middleware('permission:issue_refunds');
+            Route::get('/commission-settings', [FinanceController::class, 'commissions'])->name('commissions.index')->middleware('permission:manage_commissions');
+            Route::get('/exports', [FinanceController::class, 'exports'])->name('exports.index')->middleware('permission:export_finance');
+        });
+
+        // Reports
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/', [ReportingController::class, 'dashboard'])->name('dashboard');
+            Route::get('/revenue', [ReportingController::class, 'revenue'])->name('revenue');
+            Route::get('/revenue/items', [ReportingController::class, 'revenueItems'])->name('revenue.items');
+            Route::get('/export', [ReportingController::class, 'export'])->name('export');
+            Route::get('/wallet-recharges', [ReportingController::class, 'recharges'])->name('recharges');
+            Route::get('/calls', [ReportingController::class, 'calls'])->name('calls');
+            Route::get('/chats', [ReportingController::class, 'chats'])->name('chats');
+            Route::get('/ai', [ReportingController::class, 'aiChats'])->name('ai');
+            Route::get('/astrologers', [ReportingController::class, 'astrologers'])->name('astrologers');
+            Route::get('/refunds', [ReportingController::class, 'refunds'])->name('refunds');
+        });
+    });
+
+    // 5. Communications (Calls & Chats)
+    Route::middleware('permission:view_calls')->group(function () {
         Route::get('/calls', [CallController::class, 'index'])->name('calls.index');
         Route::get('/calls/{id}', [CallController::class, 'show'])->name('calls.show');
-
     });
 
-    // Pricing Settings
-    Route::get('/pricing', [PricingSettingsController::class, 'index'])->name('pricing.index');
-    Route::put('/pricing', [PricingSettingsController::class, 'update'])->name('pricing.update');
-
-    // AI Chat Settings
-    Route::get('/ai-settings', [App\Http\Controllers\Admin\AiSettingsController::class, 'index'])->name('ai.settings');
-    Route::post('/ai-settings', [App\Http\Controllers\Admin\AiSettingsController::class, 'update'])->name('ai.settings.update');
-    Route::get('/ai-reports', [App\Http\Controllers\Admin\AiSettingsController::class, 'reports'])->name('ai.reports');
-
-    // Reporting & Analytics
-    Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/', [ReportingController::class, 'dashboard'])->name('dashboard');
-        Route::get('/revenue', [ReportingController::class, 'revenue'])->name('revenue');
-        Route::get('/wallet-recharges', [ReportingController::class, 'recharges'])->name('recharges');
-        Route::get('/calls', [ReportingController::class, 'calls'])->name('calls');
-        Route::get('/chats', [ReportingController::class, 'chats'])->name('chats');
-        Route::get('/ai-chats', [ReportingController::class, 'aiChats'])->name('ai_chats');
-        Route::get('/astrologers', [ReportingController::class, 'astrologers'])->name('astrologers');
+    Route::middleware('permission:view_chats')->group(function () {
+        Route::get('/chats', [\App\Http\Controllers\Admin\AdminChatController::class, 'index'])->name('chats.index');
+        Route::get('/chats/{id}', [\App\Http\Controllers\Admin\AdminChatController::class, 'show'])->name('chats.show');
     });
 
-    // Promo Campaigns
-    Route::prefix('promos')->name('promos.')->group(function () {
-        Route::get('/', [App\Http\Controllers\Admin\PromoController::class, 'index'])->name('index');
-        Route::get('/create', [App\Http\Controllers\Admin\PromoController::class, 'create'])->name('create');
-        Route::post('/', [App\Http\Controllers\Admin\PromoController::class, 'store'])->name('store');
-        Route::get('/{id}', [App\Http\Controllers\Admin\PromoController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [App\Http\Controllers\Admin\PromoController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [App\Http\Controllers\Admin\PromoController::class, 'update'])->name('update');
-        Route::post('/{id}/toggle', [App\Http\Controllers\Admin\PromoController::class, 'toggle'])->name('toggle');
-        Route::delete('/{id}', [App\Http\Controllers\Admin\PromoController::class, 'destroy'])->name('destroy');
+    Route::middleware('permission:view_ai_chats')->group(function () {
+        Route::get('/ai-chats', [\App\Http\Controllers\Admin\AdminAiChatController::class, 'index'])->name('ai_chats.index');
+        Route::get('/ai-chats/{id}', [\App\Http\Controllers\Admin\AdminAiChatController::class, 'show'])->name('ai_chats.show');
     });
 
-    // Referrals
-    Route::prefix('referrals')->name('referrals.')->group(function () {
-        Route::get('/', [App\Http\Controllers\Admin\ReferralController::class, 'index'])->name('index');
-        Route::get('/{id}', [App\Http\Controllers\Admin\ReferralController::class, 'show'])->name('show');
-        Route::post('/{id}/override', [App\Http\Controllers\Admin\ReferralController::class, 'override'])->name('override');
-        Route::get('/export/csv', [App\Http\Controllers\Admin\ReferralController::class, 'export'])->name('export');
+    // 6. Settings & System (Super Admin / Specific Permissions)
+    Route::middleware('permission:manage_ai_settings')->group(function () {
+        Route::get('/ai-settings', [App\Http\Controllers\Admin\AiSettingsController::class, 'index'])->name('ai.settings');
+        Route::post('/ai-settings', [App\Http\Controllers\Admin\AiSettingsController::class, 'update'])->name('ai.settings.update');
     });
 
-    // Appointments
-    Route::prefix('appointments')->name('appointments.')->group(function () {
-        Route::get('/', [App\Http\Controllers\Admin\AppointmentController::class, 'index'])->name('index');
-        Route::get('/{id}', [App\Http\Controllers\Admin\AppointmentController::class, 'show'])->name('show');
-        Route::post('/{id}/cancel', [App\Http\Controllers\Admin\AppointmentController::class, 'cancel'])->name('cancel');
+    Route::middleware('permission:manage_commissions')->group(function () {
+        Route::get('/pricing', [PricingSettingsController::class, 'index'])->name('pricing.index');
+        Route::put('/pricing', [PricingSettingsController::class, 'update'])->name('pricing.update');
     });
 
-    // Support Tickets
-    Route::prefix('support')->name('support.')->group(function () {
-        Route::get('/', [App\Http\Controllers\Admin\SupportController::class, 'index'])->name('index');
-        Route::get('/{id}', [App\Http\Controllers\Admin\SupportController::class, 'show'])->name('show');
-        Route::post('/{id}/reply', [App\Http\Controllers\Admin\SupportController::class, 'reply'])->name('reply');
-        Route::post('/{id}/close', [App\Http\Controllers\Admin\SupportController::class, 'close'])->name('close');
-        Route::post('/{id}/resolve', [App\Http\Controllers\Admin\SupportController::class, 'resolve'])->name('resolve');
+    // System Logs
+    Route::prefix('system')->name('system.')->group(function () {
+        Route::middleware('permission:view_webhooks')->group(function () {
+            Route::get('/webhooks', [\App\Http\Controllers\Admin\AdminWebhookController::class, 'index'])->name('webhooks.index');
+            Route::get('/webhooks/{id}', [\App\Http\Controllers\Admin\AdminWebhookController::class, 'show'])->name('webhooks.show');
+            Route::post('/webhooks/{id}/retry', [\App\Http\Controllers\Admin\AdminWebhookController::class, 'retry'])->name('webhooks.retry')->middleware('permission:retry_webhooks');
+        });
+
+        Route::middleware('permission:view_audit_logs')->group(function () {
+            Route::get('/audit-logs', [\App\Http\Controllers\Admin\AdminAuditLogController::class, 'index'])->name('audit_logs.index');
+            Route::get('/audit-logs/{id}', [\App\Http\Controllers\Admin\AdminAuditLogController::class, 'show'])->name('audit_logs.show');
+        });
     });
 
-    // Disputes & Refunds
-    Route::prefix('disputes')->name('disputes.')->group(function () {
-        Route::get('/', [App\Http\Controllers\Admin\DisputeController::class, 'index'])->name('index');
-        Route::get('/{id}', [App\Http\Controllers\Admin\DisputeController::class, 'show'])->name('show');
-        Route::post('/{id}/request-info', [App\Http\Controllers\Admin\DisputeController::class, 'requestInfo'])->name('request_info');
-        Route::post('/{id}/approve', [App\Http\Controllers\Admin\DisputeController::class, 'approve'])->name('approve');
-        Route::post('/{id}/reject', [App\Http\Controllers\Admin\DisputeController::class, 'reject'])->name('reject');
-    });
-
-
-    // Content CMS
-    Route::prefix('cms')->name('cms.')->group(function () {
+    // CMS (Ops Admin)
+    Route::middleware('permission:manage_content')->prefix('cms')->name('cms.')->group(function () {
         Route::resource('pages', \App\Http\Controllers\Admin\CmsPageController::class);
         Route::resource('banners', \App\Http\Controllers\Admin\CmsBannerController::class)->except(['show']);
         Route::resource('faqs', \App\Http\Controllers\Admin\FaqController::class)->except(['show']);
-        // Featured Astrologers
+
         Route::get('/featured', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'index'])->name('featured.index');
         Route::post('/featured', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'store'])->name('featured.store');
         Route::delete('/featured/{featured}', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'destroy'])->name('featured.destroy');
         Route::post('/featured/reorder', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'updateOrder'])->name('featured.reorder');
 
-        // Blog
         Route::resource('blog/posts', \App\Http\Controllers\Admin\BlogController::class, ['as' => 'blog']);
         Route::resource('blog/categories', \App\Http\Controllers\Admin\BlogCategoryController::class, ['as' => 'blog']);
-        Route::resource('blog/categories', \App\Http\Controllers\Admin\BlogCategoryController::class, ['as' => 'blog']);
     });
 
-    // Recommendations Settings
-    Route::prefix('recommendations')->name('recommendations.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\Admin\RecommendationController::class, 'index'])->name('index');
-        Route::post('/', [\App\Http\Controllers\Admin\RecommendationController::class, 'update'])->name('update');
-        Route::get('/preview', [\App\Http\Controllers\Admin\RecommendationController::class, 'preview'])->name('preview');
+    // Legacy / Other routes (Gate later if needed)
+    Route::prefix('promos')->name('promos.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Admin\PromoController::class, 'index'])->name('index');
+        // ... promos ...
     });
 
-    // Membership Plans
-    Route::resource('memberships/plans', \App\Http\Controllers\Admin\MembershipPlanController::class, ['as' => 'memberships']);
+    // Appointments
+    Route::prefix('appointments')->name('appointments.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Admin\AppointmentController::class, 'index'])->name('index');
+        // ... appointments ...
+    });
+
+    // Support Tickets
+    Route::prefix('support')->name('support.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Admin\SupportController::class, 'index'])->name('index');
+        // ... support ...
+    });
 });

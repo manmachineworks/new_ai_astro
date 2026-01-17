@@ -49,6 +49,10 @@ class CsvExportService
             return $value->setTimezone('Asia/Kolkata')->toDateTimeString();
         }
 
+        if (is_string($value) && preg_match('/_at$/', $column) && strtotime($value) !== false) {
+            return \Carbon\Carbon::parse($value, 'UTC')->setTimezone('Asia/Kolkata')->toDateTimeString();
+        }
+
         return $value;
     }
 }

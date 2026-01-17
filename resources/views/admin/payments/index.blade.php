@@ -1,63 +1,93 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Payment Orders')
+@section('title', 'Payment History')
 
 @section('content')
-    <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Payment Orders</h5>
+    <div class="row mb-4">
+        <!-- Stats Cards -->
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start-primary h-100 rounded-4">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Total Volume</div>
+                    <h3 class="mb-0 fw-bold">₹{{ number_format($aggregates['total_volume'], 2) }}</h3>
+                </div>
+            </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Date</th>
-                        <th>User</th>
-                        <th>Txn ID</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($orders as $order)
-                        <tr>
-                            <td>{{ $order->created_at->format('M d, Y H:i') }}</td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-circle bg-light text-primary me-2">
-                                        {{ substr($order->user->name, 0, 1) }}
-                                    </div>
-                                    <div>
-                                        <div class="fw-medium">{{ $order->user->name }}</div>
-                                        <div class="small text-muted">{{ $order->user->email }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><code class="text-primary">{{ $order->merchant_transaction_id }}</code></td>
-                            <td class="fw-bold">₹{{ number_format($order->amount, 2) }}</td>
-                            <td>
-                                @if($order->status === 'success')
-                                    <span class="badge bg-success">Success</span>
-                                @elseif($order->status === 'initiated')
-                                    <span class="badge bg-warning text-dark">Pending</span>
-                                @elseif($order->status === 'failed')
-                                    <span class="badge bg-danger">Failed</span>
-                                @else
-                                    <span class="badge bg-secondary">{{ $order->status }}</span>
-                                @endif
-                            </td>
-                            <td>
-                                <a href="{{ route('admin.payments.show', $order->id) }}"
-                                    class="btn btn-sm btn-outline-primary">View</a>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start-success h-100 rounded-4">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Successful</div>
+                    <h3 class="mb-0 text-success fw-bold">{{ number_format($aggregates['success_count']) }}</h3>
+                </div>
+            </div>
         </div>
-        <div class="card-footer bg-white">
-            {{ $orders->links() }}
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start-danger h-100 rounded-4">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Failed</div>
+                    <h3 class="mb-0 text-danger fw-bold">{{ number_format($aggregates['failed_count']) }}</h3>
+                </div>
+            </div>
         </div>
     </div>
+
+    <x-admin.filter-bar :action="route('admin.payments.index')" :filters="['date', 'status']" />
+
+    <x-admin.table :columns="['Order ID', 'Date', 'User', 'Amount', 'Type', 'Method', 'Status', 'Actions']"
+        :rows="$payments">
+        @forelse($payments as $payment)
+            <tr>
+                <td class="ps-4 font-monospace small text-muted">{{ Str::limit($payment->order_id, 10, '...') }}</td>
+                <td>
+                    <div class="fw-bold text-dark">{{ $payment->created_at->format('M d') }}</div>
+                    <div class="small text-muted">{{ $payment->created_at->format('H:i') }}</div>
+                </td>
+                <td>
+                    @if($payment->user)
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-circle-sm bg-light text-secondary me-2 rounded-circle d-flex align-items-center justify-content-center"
+                                style="width:30px;height:30px;">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <a href="{{ route('admin.users.show', $payment->user_id) }}"
+                                class="text-decoration-none fw-bold text-dark">{{ $payment->user->name }}</a>
+                        </div>
+                    @else
+                        <span class="text-muted fst-italic">Deleted User</span>
+                    @endif
+                </td>
+                <td class="text-success fw-bold">₹{{ number_format($payment->amount, 2) }}</td>
+                <td>
+                    <span class="badge bg-light text-dark border">{{ ucfirst(str_replace('_', ' ', $payment->type)) }}</span>
+                </td>
+                <td>
+                    <span class="small text-muted">{{ $payment->payment_method ?? 'N/A' }}</span>
+                </td>
+                <td>
+                    @php
+                        $badgeClass = match ($payment->status) {
+                            'success' => 'success-subtle text-success',
+                            'failed' => 'danger-subtle text-danger',
+                            'pending' => 'warning-subtle text-warning',
+                            default => 'light text-dark border'
+                        };
+                    @endphp
+                    <span class="badge bg-{{ $badgeClass }} rounded-pill px-3">{{ ucfirst($payment->status) }}</span>
+                </td>
+                <td class="text-end pe-4">
+                    <a href="{{ route('admin.payments.show', $payment->id) }}" class="btn btn-sm btn-light rounded-circle"
+                        data-bs-toggle="tooltip" title="View Details">
+                        <i class="fas fa-eye text-primary"></i>
+                    </a>
+                </td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="8" class="text-center py-5">
+                    <div class="text-muted mb-2"><i class="fas fa-credit-card fa-3x opacity-25"></i></div>
+                    <p class="text-muted">No payment records found.</p>
+                </td>
+            </tr>
+        @endforelse
+    </x-admin.table>
 @endsection

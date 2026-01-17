@@ -37,8 +37,13 @@
                     <label class="form-label">Status</label>
                     <select name="is_active" class="form-select">
                         <option value="1" @selected($user->is_active)>Active</option>
-                        <option value="0" @selected(! $user->is_active)>Blocked</option>
+                        <option value="0" @selected(!$user->is_active)>Blocked</option>
                     </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Admin Notes</label>
+                    <textarea name="admin_notes" class="form-control" rows="4"
+                        placeholder="Internal notes about this user...">{{ $user->admin_notes }}</textarea>
                 </div>
                 <button class="btn btn-primary">Save</button>
                 <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary">Back</a>

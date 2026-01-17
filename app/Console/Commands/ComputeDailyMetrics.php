@@ -5,15 +5,13 @@ namespace App\Console\Commands;
 use App\Models\DailyMetric;
 use App\Models\User;
 use App\Models\CallSession;
-use App\Models\ChatSession;
 use App\Models\ChatMessageCharge;
-use App\Models\AiChatSession;
 use App\Models\AiMessageCharge;
 use App\Models\PaymentOrder;
-use App\Models\WalletTransaction;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ComputeDailyMetrics extends Command
 {
@@ -31,55 +29,101 @@ class ComputeDailyMetrics extends Command
         $this->info("Computing metrics for {$dateStr} (IST)");
         $this->comment("Range UTC: {$startUtc} to {$endUtc}");
 
-        // 1. Calls
-        $calls = CallSession::where('status', 'completed')
-            ->whereBetween('updated_at', [$startUtc, $endUtc])
-            ->selectRaw('SUM(gross_amount) as gross, SUM(platform_commission_amount) as commission')
+        // 1. Calls (settled)
+        $callDateColumn = Schema::hasColumn('call_sessions', 'settled_at')
+            ? 'settled_at'
+            : (Schema::hasColumn('call_sessions', 'ended_at_utc') ? 'ended_at_utc' : (Schema::hasColumn('call_sessions', 'ended_at') ? 'ended_at' : 'updated_at'));
+        $callGrossColumn = Schema::hasColumn('call_sessions', 'gross_amount') ? 'gross_amount' : 'cost';
+        $callCommissionColumn = Schema::hasColumn('call_sessions', 'platform_commission_amount') ? 'platform_commission_amount' : null;
+        $callEarningsColumn = Schema::hasColumn('call_sessions', 'astrologer_earnings_amount') ? 'astrologer_earnings_amount' : null;
+
+        $calls = CallSession::query()
+            ->when(Schema::hasColumn('call_sessions', 'status'), function ($query) {
+                $query->where('status', 'completed');
+            })
+            ->whereBetween($callDateColumn, [$startUtc, $endUtc])
+            ->selectRaw("SUM({$callGrossColumn}) as gross" . ($callCommissionColumn ? ", SUM({$callCommissionColumn}) as commission" : ''))
             ->first();
-        $callGross = $calls->gross ?: 0;
-        $callComm = $calls->commission ?: 0;
+        $callGross = (float) ($calls->gross ?? 0);
+        $callComm = $callCommissionColumn ? (float) ($calls->commission ?? 0) : 0.0;
         $callEarn = $callGross - $callComm;
+        if ($callEarningsColumn) {
+            $callEarn = (float) CallSession::whereBetween($callDateColumn, [$startUtc, $endUtc])->sum($callEarningsColumn);
+            $callComm = $callGross - $callEarn;
+        }
 
-        // 2. Human Chat (from charges)
-        $chatGross = ChatMessageCharge::whereBetween('created_at', [$startUtc, $endUtc])
+        // 2. Human Chat (ledger charges)
+        $chatGross = (float) ChatMessageCharge::whereBetween('created_at', [$startUtc, $endUtc])
             ->sum('amount');
-        // For human chat, commission is usually percentage. Let's assume sessions store aggregated if we updated it, 
-        // but for now let's derive from chat_sessions updated in this range if they are settled.
-        // Better: Use chat_sessions settled in this range.
-        $chatSessions = ChatSession::where('status', 'completed')
-            ->whereBetween('updated_at', [$startUtc, $endUtc])
-            ->selectRaw('SUM(total_charged) as gross, SUM(commission_amount_total) as commission')
-            ->first();
-        $chatGrossFinal = $chatSessions->gross ?: 0;
-        $chatCommFinal = $chatSessions->commission ?: 0;
-        $chatEarnFinal = $chatGrossFinal - $chatCommFinal;
+        $chatComm = 0.0;
+        if (Schema::hasColumn('chat_sessions', 'commission_percent_snapshot')) {
+            $chatComm = (float) DB::table('chat_message_charges')
+                ->join('chat_sessions', 'chat_sessions.id', '=', 'chat_message_charges.chat_session_id')
+                ->whereBetween('chat_message_charges.created_at', [$startUtc, $endUtc])
+                ->selectRaw('SUM(chat_message_charges.amount * (COALESCE(chat_sessions.commission_percent_snapshot, 0) / 100)) as commission')
+                ->value('commission');
+        }
+        $chatEarnFinal = $chatGross - $chatComm;
 
-        // 3. AI Chat
-        $aiSessions = AiChatSession::whereBetween('updated_at', [$startUtc, $endUtc])
-            ->selectRaw('SUM(total_charged) as gross, SUM(commission_amount_total) as commission')
-            ->first();
-        $aiGross = $aiSessions->gross ?: 0;
-        $aiComm = $aiSessions->commission ?: 0;
+        // 3. AI Chat (ledger charges)
+        $aiGross = (float) AiMessageCharge::whereBetween('created_at', [$startUtc, $endUtc])
+            ->sum('amount');
+        $aiComm = 0.0;
+        if (Schema::hasColumn('ai_chat_sessions', 'commission_percent_snapshot')) {
+            $aiComm = (float) DB::table('ai_message_charges')
+                ->join('ai_chat_sessions', 'ai_chat_sessions.id', '=', 'ai_message_charges.ai_chat_session_id')
+                ->whereBetween('ai_message_charges.created_at', [$startUtc, $endUtc])
+                ->selectRaw('SUM(ai_message_charges.amount * (COALESCE(ai_chat_sessions.commission_percent_snapshot, 0) / 100)) as commission')
+                ->value('commission');
+        }
         $aiEarn = $aiGross - $aiComm;
 
-        // 4. Wallet Recharges
-        $rechargesSuccess = PaymentOrder::where('status', 'PAID')
-            ->whereBetween('updated_at', [$startUtc, $endUtc])
-            ->sum('amount');
-        $rechargeCountSuccess = PaymentOrder::where('status', 'PAID')
-            ->whereBetween('updated_at', [$startUtc, $endUtc])
-            ->count();
-        $rechargeCountFailed = PaymentOrder::whereIn('status', ['FAILED', 'EXPIRED'])
-            ->whereBetween('updated_at', [$startUtc, $endUtc])
-            ->count();
+        // 4. Wallet Recharges (PhonePe orders)
+        $successStatuses = ['success', 'PAID'];
+        $failedStatuses = ['failed', 'FAILED', 'EXPIRED', 'expired'];
+        $rechargeBase = PaymentOrder::query()
+            ->when(Schema::hasColumn('payment_orders', 'type'), function ($query) {
+                $query->where('type', 'wallet_recharge');
+            })
+            ->whereBetween('updated_at', [$startUtc, $endUtc]);
+        $rechargesSuccess = (clone $rechargeBase)->whereIn('status', $successStatuses)->sum('amount');
+        $rechargeCountSuccess = (clone $rechargeBase)->whereIn('status', $successStatuses)->count();
+        $rechargeCountFailed = (clone $rechargeBase)->whereIn('status', $failedStatuses)->count();
 
-        // 5. User Stats
+        // 5. Refunds
+        $refundsAmount = 0.0;
+        if (Schema::hasTable('refunds')) {
+            $refundsAmount = (float) DB::table('refunds')
+                ->where('status', 'completed')
+                ->whereBetween('updated_at', [$startUtc, $endUtc])
+                ->sum('amount');
+        }
+
+        // 6. User Stats
         $newUsers = User::whereBetween('created_at', [$startUtc, $endUtc])->count();
 
-        // Active users: Users who performed any transaction or session
-        $activeUsers = DB::table('wallet_transactions')
+        // Active users: Users who performed any transaction or session (ledger-first)
+        $walletActivity = DB::table('wallet_transactions')
             ->whereBetween('created_at', [$startUtc, $endUtc])
-            ->distinct('user_id')
+            ->select('user_id');
+        $callActivity = DB::table('call_sessions')
+            ->whereBetween($callDateColumn, [$startUtc, $endUtc])
+            ->select('user_id');
+        $chatActivity = DB::table('chat_message_charges')
+            ->join('chat_sessions', 'chat_sessions.id', '=', 'chat_message_charges.chat_session_id')
+            ->whereBetween('chat_message_charges.created_at', [$startUtc, $endUtc])
+            ->select('chat_sessions.user_id as user_id');
+        $aiActivity = DB::table('ai_message_charges')
+            ->join('ai_chat_sessions', 'ai_chat_sessions.id', '=', 'ai_message_charges.ai_chat_session_id')
+            ->whereBetween('ai_message_charges.created_at', [$startUtc, $endUtc])
+            ->select('ai_chat_sessions.user_id as user_id');
+
+        $activeUsers = DB::query()
+            ->fromSub(
+                $walletActivity->union($callActivity)->union($chatActivity)->union($aiActivity),
+                'activity'
+            )
+            ->distinct()
             ->count('user_id');
 
         // Upsert
@@ -89,8 +133,8 @@ class ComputeDailyMetrics extends Command
                 'call_gross' => $callGross,
                 'call_commission' => $callComm,
                 'call_earnings' => $callEarn,
-                'chat_gross' => $chatGrossFinal,
-                'chat_commission' => $chatCommFinal,
+                'chat_gross' => $chatGross,
+                'chat_commission' => $chatComm,
                 'chat_earnings' => $chatEarnFinal,
                 'ai_gross' => $aiGross,
                 'ai_commission' => $aiComm,
@@ -98,6 +142,7 @@ class ComputeDailyMetrics extends Command
                 'wallet_recharge_success' => $rechargesSuccess,
                 'wallet_recharge_count_success' => $rechargeCountSuccess,
                 'wallet_recharge_count_failed' => $rechargeCountFailed,
+                'refunds_amount' => $refundsAmount,
                 'new_users' => $newUsers,
                 'active_users' => $activeUsers,
             ]

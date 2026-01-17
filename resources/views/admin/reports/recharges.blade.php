@@ -1,68 +1,69 @@
-@extends('admin.layouts.app')
+﻿@extends('admin.layouts.app')
 
-@section('title', 'Wallet Recharges Report')
+@section('title', 'Wallet Recharges')
 
 @section('content')
     <div class="container-fluid py-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold m-0">Wallet Recharges</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <a href="{{ route('admin.reports.recharges', array_merge(request()->all(), ['export' => 1])) }}"
-                    class="btn btn-outline-primary rounded-pill px-4">
-                    <i class="fas fa-file-csv me-2"></i>Export CSV
-                </a>
-                <a href="{{ route('admin.reports.dashboard') }}" class="btn btn-light rounded-pill px-4 ms-2">Back to
-                    Dashboard</a>
+                <h2 class="fw-bold m-0">Wallet Recharges</h2>
+                <div class="text-muted small">PhonePe payment orders (status-based)</div>
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-0">
-                <table class="table align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4">Order ID</th>
-                            <th>User</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Date (IST)</th>
-                            <th class="pe-4 text-end">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($orders as $order)
-                            <tr>
-                                <td class="ps-4">
-                                    <span class="small text-muted">{{ $order->merchant_transaction_id }}</span>
-                                </td>
-                                <td>
-                                    <div class="fw-bold">{{ $order->user->name }}</div>
-                                    <div class="small text-muted">{{ $order->user->phone }}</div>
-                                </td>
-                                <td class="fw-bold">₹{{ $order->amount }}</td>
-                                <td>
-                                    @if($order->status === 'PAID')
-                                        <span class="badge bg-success-subtle text-success rounded-pill px-3">PAID</span>
-                                    @elseif($order->status === 'FAILED')
-                                        <span class="badge bg-danger-subtle text-danger rounded-pill px-3">FAILED</span>
-                                    @else
-                                        <span
-                                            class="badge bg-warning-subtle text-warning rounded-pill px-3">{{ $order->status }}</span>
-                                    @endif
-                                </td>
-                                <td>{{ $order->updated_at->setTimezone('Asia/Kolkata')->format('d M Y, h:i A') }}</td>
-                                <td class="pe-4 text-end">
-                                    <a href="{{ route('admin.payments.show', $order->id) }}"
-                                        class="btn btn-sm btn-light rounded-pill">Details</a>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer bg-white border-0 py-4 px-4">
-                {{ $orders->links() }}
-            </div>
-        </div>
+        <x-admin.report-tabs />
+
+        <x-admin.report-filters
+            :action="route('admin.reports.recharges')"
+            :range="$range"
+            :exportRoute="route('admin.reports.recharges')"
+            :exportParams="['export' => 1]">
+            <select name="status" class="form-select form-select-sm border-0 bg-light rounded-pill px-3">
+                <option value="">All Statuses</option>
+                <option value="success" {{ request('status') === 'success' ? 'selected' : '' }}>Success</option>
+                <option value="failed" {{ request('status') === 'failed' ? 'selected' : '' }}>Failed</option>
+                <option value="expired" {{ request('status') === 'expired' ? 'selected' : '' }}>Expired</option>
+            </select>
+        </x-admin.report-filters>
+
+        <x-admin.table :columns="['Date (IST)', 'Transaction ID', 'User', 'Amount', 'Status', 'Action']" :rows="$orders">
+            @forelse($orders as $order)
+                @php
+                    $ts = $order->updated_at?->setTimezone('Asia/Kolkata');
+                @endphp
+                <tr>
+                    <td class="ps-4">
+                        <div class="fw-bold">{{ $ts?->format('d M Y') }}</div>
+                        <div class="small text-muted">{{ $ts?->format('H:i') }}</div>
+                    </td>
+                    <td class="font-monospace small">{{ $order->merchant_transaction_id }}</td>
+                    <td>
+                        @if($order->user)
+                            <a href="{{ route('admin.users.show', $order->user_id) }}" class="text-decoration-none fw-bold">{{ $order->user->name }}</a>
+                        @else
+                            <span class="text-muted">Deleted User</span>
+                        @endif
+                    </td>
+                    <td class="fw-bold text-success">INR {{ number_format($order->amount, 2) }}</td>
+                    <td>
+                        @php
+                            $status = strtolower($order->status ?? '');
+                            $badge = $status === 'success' ? 'success' : ($status === 'failed' ? 'danger' : 'warning');
+                        @endphp
+                        <span class="badge bg-{{ $badge }} rounded-pill px-3">{{ ucfirst($status) }}</span>
+                    </td>
+                    <td class="pe-4 text-end">
+                        <a href="{{ route('admin.payments.show', $order->id) }}" class="btn btn-sm btn-light rounded-pill">View</a>
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No recharge orders in this range.</td>
+                </tr>
+            @endforelse
+        </x-admin.table>
     </div>
 @endsection
+
+
+

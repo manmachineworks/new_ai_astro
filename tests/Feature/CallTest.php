@@ -73,6 +73,33 @@ class CallTest extends TestCase
         $response->assertStatus(402); // Payment Required
     }
 
+    public function test_initiate_call_missing_pricing_returns_validation_error()
+    {
+        $astro = User::factory()->create();
+        $astro->assignRole('Astrologer');
+        $astro->astrologerProfile()->create([
+            'call_per_minute' => 0,
+            'is_call_enabled' => true,
+            'visibility' => true
+        ]);
+
+        $user = User::factory()->create(['wallet_balance' => 500]);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->mock(CallerDeskService::class, function ($mock) {
+            $mock->shouldReceive('initiateCall')->never();
+        });
+
+        $response = $this->postJson('/api/call/initiate', ['astrologer_id' => $astro->id]);
+
+        $response->assertStatus(422)
+            ->assertJson(['message' => 'Call pricing is not configured. Please try again later.']);
+
+        $this->assertDatabaseMissing('call_sessions', [
+            'user_id' => $user->id,
+        ]);
+    }
+
     public function test_webhook_billing()
     {
         // Setup Users

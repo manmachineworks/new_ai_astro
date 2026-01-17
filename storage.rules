@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() { return request.auth != null; }
+
+    function isParticipant(chatId) {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/chats/$(chatId))
+        && request.auth.uid in firestore.get(/databases/(default)/documents/chats/$(chatId)).data.participantUids;
+    }
+
+    match /chat_uploads/{chatId}/{uid}/{fileName} {
+      allow read: if isParticipant(chatId);
+      allow write: if isSignedIn()
+        && request.auth.uid == uid
+        && isParticipant(chatId)
+        && request.resource.size < 10 * 1024 * 1024; // 10MB cap
+    }
+  }
+}

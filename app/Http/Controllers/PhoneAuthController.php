@@ -9,8 +9,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
+use Illuminate\Validation\ValidationException;
 
 class PhoneAuthController extends Controller
 {
@@ -65,6 +67,42 @@ class PhoneAuthController extends Controller
         }
 
         Auth::login($user);
+        $request->session()->regenerate();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Authenticated',
+                'redirect' => $this->dashboardRoute($user),
+            ]);
+        }
+
+        return redirect()->to($this->dashboardRoute($user));
+    }
+
+    public function loginWithEmail(Request $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $email = strtolower($validated['email']);
+        $password = $validated['password'];
+        $user = User::where('email', $email)->first();
+
+        if (!$user || empty($user->password) || !Hash::check($password, $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => 'Invalid credentials.',
+            ]);
+        }
+
+        if ($user->is_active === false) {
+            throw ValidationException::withMessages([
+                'email' => 'Your account is inactive.',
+            ]);
+        }
+
+        Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
         if ($request->expectsJson()) {

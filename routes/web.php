@@ -14,6 +14,7 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [PhoneAuthController::class, 'show'])->name('login');
     Route::get('/auth/phone', [PhoneAuthController::class, 'show'])->name('auth.phone.show');
     Route::post('/auth/phone/verify', [PhoneAuthController::class, 'verify'])->name('auth.phone.verify');
+    Route::post('/auth/email/login', [PhoneAuthController::class, 'loginWithEmail'])->name('auth.email.login');
 });
 
 Route::middleware('auth')->group(function () {
@@ -51,19 +52,22 @@ Route::middleware('auth')->group(function () {
     Route::post('/auth/logout', [PhoneAuthController::class, 'logout'])->name('auth.logout');
 
     // Web Wallet Recharge
-    Route::get('/wallet/recharge', [App\Http\Controllers\WalletController::class, 'showRecharge'])->name('wallet.recharge');
-    Route::post('/wallet/recharge', [\App\Http\Controllers\PaymentController::class, 'initiateWeb'])->name('wallet.recharge.init');
+    Route::get('/wallet/recharge', [\App\Http\Controllers\PaymentController::class, 'showRecharge'])->name('wallet.show');
+    Route::post('/wallet/recharge', [\App\Http\Controllers\PaymentController::class, 'initiateRecharge'])->name('wallet.initiate');
 
     // Astrologer Only
     Route::middleware(['role:Astrologer'])->prefix('astrologer')->name('astrologer.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\AstrologerDashboardController::class, 'index'])->name('dashboard');
+        Route::post('/dashboard/layout', [\App\Http\Controllers\AstrologerDashboardController::class, 'updateDashboardLayout'])->name('dashboard.layout');
         Route::get('/profile', [App\Http\Controllers\AstrologerDashboardController::class, 'editProfile'])->name('profile');
         Route::post('/profile', [App\Http\Controllers\AstrologerDashboardController::class, 'updateProfile'])->name('profile.update');
+        Route::post('/toggle-status', [\App\Http\Controllers\AstrologerDashboardController::class, 'toggleStatus'])->name('toggle-status');
         Route::get('/services', [App\Http\Controllers\AstrologerDashboardController::class, 'editServices'])->name('services');
         Route::post('/services', [App\Http\Controllers\AstrologerDashboardController::class, 'updateServices'])->name('services.update');
         Route::get('/availability', [App\Http\Controllers\AstrologerDashboardController::class, 'editAvailability'])->name('availability');
         Route::post('/availability', [App\Http\Controllers\AstrologerDashboardController::class, 'updateAvailability'])->name('availability.update');
         Route::get('/calls', [App\Http\Controllers\AstrologerDashboardController::class, 'calls'])->name('calls');
+        Route::get('/earnings', [App\Http\Controllers\AstrologerDashboardController::class, 'earnings'])->name('earnings');
         Route::get('/chats', [App\Http\Controllers\ChatController::class, 'astrologerIndex'])->name('chats');
 
         // Astrologer Appointments
@@ -82,6 +86,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/appointments/hold', [App\Http\Controllers\AppointmentController::class, 'hold'])->name('appointments.hold');
     Route::post('/appointments', [App\Http\Controllers\AppointmentController::class, 'store'])->name('appointments.store');
     Route::post('/appointments/{id}/cancel', [App\Http\Controllers\AppointmentController::class, 'cancel'])->name('appointments.cancel');
+
+    Route::post('/withdrawals', [App\Http\Controllers\WithdrawalController::class, 'store'])
+        ->middleware(['role:Astrologer'])
+        ->name('withdrawals.store');
 
     // Promo & Referral Routes
     Route::prefix('api')->group(function () {

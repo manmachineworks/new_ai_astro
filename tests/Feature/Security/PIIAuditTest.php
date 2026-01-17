@@ -7,6 +7,7 @@ use App\Models\AstrologerProfile;
 use App\Models\ChatSession;
 use App\Models\CallSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 use Spatie\Permission\Models\Role;
 
@@ -62,12 +63,20 @@ class PIIAuditTest extends TestCase
     /** @test */
     public function it_does_not_leak_user_pii_in_astrologer_call_history()
     {
-        CallSession::create([
+        $callData = [
             'user_id' => $this->user->id,
-            'astrologer_profile_id' => $this->astroProfile->id,
             'status' => 'completed',
-            'gross_amount' => 100
-        ]);
+            'gross_amount' => 100,
+            'user_masked_identifier' => $this->user->email,
+        ];
+
+        if (Schema::hasColumn('call_sessions', 'astrologer_profile_id')) {
+            $callData['astrologer_profile_id'] = $this->astroProfile->id;
+        } else {
+            $callData['astrologer_user_id'] = $this->astroUser->id;
+        }
+
+        CallSession::create($callData);
 
         $this->actingAs($this->astroUser);
         $response = $this->get(route('astrologer.calls'));

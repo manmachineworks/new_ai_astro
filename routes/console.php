@@ -13,3 +13,4 @@ Schedule::job(new \App\Jobs\ChatBillingJob)->everyMinute();
 Schedule::command('appointments:reminders')->everyMinute();
 Schedule::command('slots:generate')->dailyAt('00:30');
 Schedule::command('memberships:expire')->daily();
+Schedule::command('metrics:daily')->dailyAt('00:30')->timezone('Asia/Kolkata');

@@ -69,4 +69,28 @@ class PhonePeService
         $calculatedChecksum = hash('sha256', $base64Payload . $this->saltKey) . '###' . $this->saltIndex;
         return $calculatedChecksum === $xVerify;
     }
+
+    public function checkStatus(string $merchantTransactionId): ?array
+    {
+        $path = "/pg/v1/status/{$this->merchantId}/{$merchantTransactionId}";
+        $checksum = hash('sha256', $path . $this->saltKey) . '###' . $this->saltIndex;
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'X-VERIFY' => $checksum,
+            'X-MERCHANT-ID' => $this->merchantId,
+        ])->get($this->baseUrl . $path);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        Log::error('PhonePe Status Check Failed', [
+            'merchant_transaction_id' => $merchantTransactionId,
+            'status' => $response->status(),
+            'response' => $response->body(),
+        ]);
+
+        return null;
+    }
 }

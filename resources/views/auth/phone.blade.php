@@ -8,7 +8,7 @@
                     <div class="text-center mb-4">
                         <i class="fa-solid fa-mobile-screen fa-3x text-gold mb-3"></i>
                         <h3>Login / Signup</h3>
-                        <p class="text-muted">Enter your number to continue</p>
+                        <p class="text-muted">Enter your phone number or email to continue</p>
                     </div>
 
                     @if(session('error'))
@@ -17,6 +17,10 @@
 
                     @if(session('success'))
                         <div class="alert alert-success mb-3">{{ session('success') }}</div>
+                    @endif
+                    
+                    @if($errors->any())
+                        <div class="alert alert-danger mb-3">{{ $errors->first() }}</div>
                     @endif
 
                     <form method="POST" action="{{ route('auth.phone.verify') }}">
@@ -49,6 +53,31 @@
                                 <a href="{{ route('auth.phone.show') }}" class="small text-gold">Change Number</a>
                             </div>
                         @endif
+                    </form>
+
+                    <div class="text-center my-4 text-muted small">or</div>
+
+                    <form method="POST" action="{{ route('auth.email.login') }}">
+                        @csrf
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Email</label>
+                            <input type="email" name="email" class="form-control form-control-cosmic form-control-lg"
+                                placeholder="you@example.com" value="{{ old('email') }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Password</label>
+                            <input type="password" name="password" class="form-control form-control-cosmic form-control-lg"
+                                placeholder="Enter your password" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                            <label class="form-check-label small text-muted" for="remember">
+                                Remember me
+                            </label>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-outline-light btn-lg">Login with Email</button>
+                        </div>
                     </form>
                 </div>
             </div>

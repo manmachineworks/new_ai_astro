@@ -38,9 +38,17 @@ class CallController extends Controller
 
         $profile = $astrologer->astrologerProfile;
 
+        if (!$profile) {
+            return response()->json(['message' => 'Astrologer profile is unavailable for calls.'], 422);
+        }
+
         // Check availability
         if (!$profile->is_call_enabled) {
             return response()->json(['message' => 'Astrologer is currently unavailable for calls'], 400);
+        }
+
+        if (!$profile->call_per_minute || $profile->call_per_minute <= 0) {
+            return response()->json(['message' => 'Call pricing is not configured. Please try again later.'], 422);
         }
 
         // Pricing Gate: Min Balance
@@ -91,6 +99,20 @@ class CallController extends Controller
                 'status' => 'connecting',
                 'meta' => ['api_response' => $response]
             ]);
+
+            // Notify Astrologer
+            \App\Jobs\SendPushNotificationJob::dispatch(
+                $astrologer->id,
+                'call_incoming',
+                [
+                    'call_session_id' => $callId,
+                    'user_name' => "User #{$user->id}", // Masked Identity
+                    'deeplink' => "app://calls/{$callId}"
+                ],
+                'Incoming Call',
+                "New call request from User #{$user->id}"
+            );
+
             return response()->json(['status' => 'success', 'call_id' => $callId]);
         }
 
@@ -119,11 +141,23 @@ class CallController extends Controller
 
         DB::transaction(function () use ($session, $status, $duration, $request) {
             $session->update([
-                'status' => $status === 'completed' ? 'completed' : 'failed',
+                'status' => $status === 'completed' ? 'completed' : ($status === 'active' ? 'active' : 'failed'),
                 'duration_seconds' => $duration,
-                'ended_at' => now(),
+                'ended_at' => $status === 'completed' ? now() : null,
                 'meta' => array_merge($session->meta ?? [], ['webhook' => $request->all()]),
             ]);
+
+            // Call Started (Answered)
+            if ($status === 'active' && $session->status !== 'active') { // Idempotency check
+                \App\Jobs\SendPushNotificationJob::dispatch(
+                    $session->user_id,
+                    'call_started',
+                    ['call_session_id' => $session->callerdesk_call_id, 'deeplink' => "app://calls/{$session->callerdesk_call_id}"],
+                    'Call Connected',
+                    "You are now connected with {$session->astrologer->name}."
+                );
+                return; // Exit transaction early for active state
+            }
 
             // Retrieve Hold
             $holdId = $session->meta['wallet_hold_id'] ?? null;
@@ -159,10 +193,39 @@ class CallController extends Controller
                     "Earning from call with {$session->user->name}"
                 );
 
+                // Notify User: Call Ended
+                \App\Jobs\SendPushNotificationJob::dispatch(
+                    $session->user_id,
+                    'call_ended',
+                    [
+                        'call_session_id' => $session->callerdesk_call_id,
+                        'duration' => (string) $mins,
+                        'cost' => (string) $cost,
+                        'deeplink' => "app://calls/{$session->callerdesk_call_id}/summary"
+                    ],
+                    'Call Summary',
+                    "Call ended. Duration: {$mins} mins. Cost: INR {$cost}."
+                );
+
             } else {
                 // Failed/Busy/No Answer -> Release Hold
                 if ($hold) {
                     $this->walletService->releaseHold($hold);
+                }
+
+                // Notify Astrologer: Missed Call (if busy/no-answer)
+                if (in_array($status, ['busy', 'no-answer', 'failed'])) {
+                    \App\Jobs\SendPushNotificationJob::dispatch(
+                        $session->astrologer_user_id,
+                        'call_missed',
+                        [
+                            'call_session_id' => $session->callerdesk_call_id,
+                            'timestamp' => now()->toIso8601String(),
+                            'deeplink' => "app://calls/history"
+                        ],
+                        'Missed Call',
+                        "You missed a call from User #{$session->user_id}."
+                    );
                 }
             }
         });

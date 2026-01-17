@@ -85,8 +85,9 @@
                     .then(reg => console.log('SW Registered!', reg))
                     .catch(err => console.log('SW Failed', err));
             });
-    }
+        }
     </script>
+    @include('partials.firebase-scripts')
 </body>
 
 </html>

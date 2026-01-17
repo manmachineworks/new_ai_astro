@@ -54,7 +54,11 @@ class WithdrawalController extends Controller
             return $withdrawal;
         });
 
-        return response()->json($withdrawal, 201);
+        if ($request->expectsJson()) {
+            return response()->json($withdrawal, 201);
+        }
+
+        return back()->with('success', 'Withdrawal request submitted.');
     }
 
     /**

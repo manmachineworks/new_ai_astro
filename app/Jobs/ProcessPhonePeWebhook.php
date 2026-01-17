@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\PaymentOrder;
+use App\Models\WalletTransaction;
 use App\Models\WebhookEvent;
 use App\Services\WalletService;
 use Illuminate\Bus\Queueable;
@@ -73,16 +74,18 @@ class ProcessPhonePeWebhook implements ShouldQueue
                 ]);
 
                 // Credit Wallet (Idempotent)
-                $walletService->credit(
-                    $order->user,
-                    $order->amount,
-                    'recharge',
-                    $order->id,
-                    "Wallet Recharge (PhonePe)",
-                    ['provider_ref' => $providerTxnId],
-                    "phonepe:{$txnId}", // Idempotency Key
-                    'phonepe'
-                );
+                if (!$this->hasRechargeCredit($order, $txnId)) {
+                    $walletService->credit(
+                        $order->user,
+                        $order->amount,
+                        'recharge',
+                        $order->id,
+                        "Wallet Recharge (PhonePe)",
+                        ['provider_ref' => $providerTxnId],
+                        "phonepe:{$txnId}", // Idempotency Key
+                        'phonepe'
+                    );
+                }
 
             } else {
                 $order->update([
@@ -107,5 +110,19 @@ class ProcessPhonePeWebhook implements ShouldQueue
             // Don't release job back to queue unless it's a transient error
             // For logic errors like 'Payment Order not found', we stop.
         }
+    }
+
+    protected function hasRechargeCredit(PaymentOrder $order, string $txnId): bool
+    {
+        return WalletTransaction::query()
+            ->where('type', 'credit')
+            ->where(function ($query) use ($order, $txnId) {
+                $query->where(function ($inner) use ($order) {
+                    $inner->where('reference_type', 'recharge')
+                        ->where('reference_id', $order->id);
+                })->orWhere('idempotency_key', $txnId)
+                    ->orWhere('idempotency_key', 'phonepe:' . $txnId);
+            })
+            ->exists();
     }
 }

@@ -47,15 +47,35 @@ class WalletService
                 'meta' => $meta,
                 'idempotency_key' => $idempotencyKey,
             ]);
+
+            // Notification Logic (Recharge Success)
+            if ($source == 'phonepe' || $description == 'Wallet Recharge') {
+                \App\Jobs\SendPushNotificationJob::dispatch(
+                    $user->id,
+                    'wallet_recharge_success',
+                    ['amount' => (string) $amount, 'balance' => (string) $afterBalance, 'deeplink' => 'app://wallet'],
+                    'Recharge Successful',
+                    'Your wallet has been credited with INR ' . number_format($amount, 2)
+                );
+            }
+
+            return $txn;
         });
     }
 
     /**
      * Debit the wallet.
      */
-    public function debit(User $user, float|int|string $amount, string $referenceType = null, string $referenceId = null, string $description = null, array $meta = null, string $source = 'system'): WalletTransaction
+    public function debit(User $user, float|int|string $amount, string $referenceType = null, string $referenceId = null, string $description = null, array $meta = null, string $source = 'system', string $idempotencyKey = null): WalletTransaction
     {
-        return DB::transaction(function () use ($user, $amount, $referenceType, $referenceId, $description, $meta, $source) {
+        if ($idempotencyKey) {
+            $existing = WalletTransaction::where('idempotency_key', $idempotencyKey)->first();
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        return DB::transaction(function () use ($user, $amount, $referenceType, $referenceId, $description, $meta, $source, $idempotencyKey) {
             $lockedUser = User::where('id', $user->id)->lockForUpdate()->first();
 
             if ($lockedUser->wallet_balance < $amount) {
@@ -68,7 +88,7 @@ class WalletService
             $lockedUser->wallet_balance = $afterBalance;
             $lockedUser->save();
 
-            return WalletTransaction::create([
+            $txn = WalletTransaction::create([
                 'user_id' => $user->id,
                 'amount' => $amount,
                 'type' => 'debit',
@@ -79,7 +99,31 @@ class WalletService
                 'reference_id' => $referenceId,
                 'description' => $description,
                 'meta' => $meta,
+                'idempotency_key' => $idempotencyKey,
             ]);
+
+            // Notification Logic (Post-transaction)
+            if ($source !== 'system_adjustment') {
+                if ($afterBalance <= 0) {
+                    \App\Jobs\SendPushNotificationJob::dispatch(
+                        $user->id,
+                        'wallet_exhausted',
+                        ['balance' => (string) $afterBalance, 'deeplink' => 'app://wallet/recharge'],
+                        'Wallet Empty',
+                        'Your balance is zero. Recharge to continue services.'
+                    );
+                } elseif ($afterBalance < 100) { // LOW THRESHOLD = 100
+                    \App\Jobs\SendPushNotificationJob::dispatch(
+                        $user->id,
+                        'wallet_low',
+                        ['balance' => (string) $afterBalance, 'deeplink' => 'app://wallet/recharge'],
+                        'Low Balance',
+                        'Your wallet is running low (INR ' . number_format($afterBalance, 2) . ').'
+                    );
+                }
+            }
+
+            return $txn;
         });
     }
 

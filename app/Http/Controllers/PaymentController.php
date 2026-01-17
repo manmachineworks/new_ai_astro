@@ -2,172 +2,154 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PhonepePayment;
+use App\Models\PaymentOrder;
+use App\Models\User;
 use App\Services\PhonePeService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PaymentController extends Controller
 {
-    protected $phonePeService;
-    protected $walletService;
+    protected $phonePe;
+    protected $wallet;
 
-    public function __construct(PhonePeService $phonePeService, WalletService $walletService)
+    public function __construct(PhonePeService $phonePe, WalletService $wallet)
     {
-        $this->phonePeService = $phonePeService;
-        $this->walletService = $walletService;
+        $this->phonePe = $phonePe;
+        $this->wallet = $wallet;
     }
 
-    public function initiate(Request $request)
+    // 1. Show Recharge Page
+    public function showRecharge()
+    {
+        $user = auth()->user();
+        $transactions = $user->walletTransactions()->latest()->limit(5)->get();
+        return view('user.wallet.recharge', compact('user', 'transactions'));
+    }
+
+    // 2. Initiate Payment
+    public function initiateRecharge(Request $request)
     {
         $request->validate([
             'amount' => 'required|numeric|min:1',
         ]);
 
-        $user = $request->user();
+        $user = auth()->user();
         $amount = $request->amount;
-        $merchantTxnId = 'TXN_' . Str::uuid()->toString();
 
-        // Create Payment Record
-        $payment = PhonepePayment::create([
+        // Unique Transaction ID
+        $merchantTxnId = 'TXN_' . Str::random(10);
+
+        // Create Pending Order
+        $order = PaymentOrder::create([
             'user_id' => $user->id,
-            'merchant_txn_id' => $merchantTxnId,
             'amount' => $amount,
-            'status' => 'initiated',
+            'merchant_transaction_id' => $merchantTxnId,
+            'status' => 'pending',
+            'provider' => 'phonepe',
+            'currency' => 'INR',
         ]);
 
-        // Call PhonePe API
-        $response = $this->phonePeService->initiatePayment($merchantTxnId, $amount, (string) $user->id, $user->phone);
+        // Call PhonePe
+        $response = $this->phonePe->initiatePayment($merchantTxnId, $amount, $user->id, $user->phone);
 
         if ($response && isset($response['data']['instrumentResponse']['redirectInfo']['url'])) {
-            $payment->update([
-                'request_payload' => $response,
-                'status' => 'pending'
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'redirect_url' => $response['data']['instrumentResponse']['redirectInfo']['url'],
-                'txn_id' => $merchantTxnId
-            ]);
-        }
-
-        return response()->json(['status' => 'error', 'message' => 'Payment initiation failed'], 500);
-    }
-
-    public function initiateWeb(Request $request)
-    {
-        $request->validate([
-            'amount' => 'required|numeric|min:1',
-        ]);
-
-        $user = $request->user();
-        $amount = $request->amount;
-        $merchantTxnId = 'TXN_' . Str::uuid()->toString();
-
-        // Create Payment Record
-        $payment = PhonepePayment::create([
-            'user_id' => $user->id,
-            'merchant_txn_id' => $merchantTxnId,
-            'amount' => $amount,
-            'status' => 'initiated',
-        ]);
-
-        // Call PhonePe API
-        $response = $this->phonePeService->initiatePayment($merchantTxnId, $amount, (string) $user->id, $user->phone);
-
-        if ($response && isset($response['data']['instrumentResponse']['redirectInfo']['url'])) {
-            $payment->update([
-                'request_payload' => $response,
-                'status' => 'pending'
-            ]);
-
+            $order->update(['payment_url' => $response['data']['instrumentResponse']['redirectInfo']['url']]);
             return redirect($response['data']['instrumentResponse']['redirectInfo']['url']);
         }
 
-        return back()->with('error', 'Payment initiation failed');
+        return back()->with('error', 'Failed to initiate payment. Please try again.');
     }
 
-    public function callback(Request $request)
+    // 3. Handle Webhook (Server-to-Server)
+    public function handleWebhook(Request $request)
     {
-        $response = $request->input('response');
+        $payload = $request->input('response');
         $xVerify = $request->header('X-VERIFY');
 
-        if (!$response || !$xVerify) {
-            return response()->json(['status' => 'error', 'message' => 'Invalid request'], 400);
+        if (!$payload || !$xVerify) {
+            return response()->json(['error' => 'Invalid Request'], 400);
         }
 
-        if (!$this->phonePeService->verifyCallback($response, $xVerify)) {
-            Log::warning('PhonePe Webhook Signature Verification Failed');
-            return response()->json(['status' => 'error', 'message' => 'Signature verification failed'], 403);
+        // Verify Signature
+        if (!$this->phonePe->verifyCallback($payload, $xVerify)) {
+            Log::error('PhonePe Webhook Signature Mismatch');
+            return response()->json(['error' => 'Signature Mismatch'], 400);
         }
 
-        $decoded = json_decode(base64_decode($response), true);
+        $data = json_decode(base64_decode($payload), true);
 
-        if (!$decoded || !isset($decoded['data']['merchantTransactionId'])) {
-            return response()->json(['status' => 'error', 'message' => 'Invalid payload'], 400);
+        if (!$data || !isset($data['data']['merchantTransactionId'])) {
+            return response()->json(['error' => 'Invalid Payload'], 400);
         }
 
-        $txnId = $decoded['data']['merchantTransactionId'];
-        $code = $decoded['code'];
+        $txnId = $data['data']['merchantTransactionId'];
+        $providerRefId = $data['data']['transactionId'] ?? null;
+        $status = $data['code'] ?? 'FAILED';
 
-        $payment = PhonepePayment::where('merchant_txn_id', $txnId)->first();
+        $order = PaymentOrder::where('merchant_transaction_id', $txnId)->first();
 
-        if (!$payment) {
-            Log::error('PhonePe Webhook: Payment not found', ['txn_id' => $txnId]);
-            return response()->json(['status' => 'error', 'message' => 'Payment not found'], 404);
+        if (!$order) {
+            Log::error('Payment Order Not Found: ' . $txnId);
+            return response()->json(['status' => 'Order Not Found'], 404);
         }
 
-        // Idempotency: If already processed, return success
-        if ($payment->status === 'success' || $payment->status === 'failed') {
-            return response()->json(['status' => 'success', 'message' => 'Already processed']);
+        if ($order->status === 'completed') {
+            return response()->json(['status' => 'Already Processed']);
         }
 
-        if ($code === 'PAYMENT_SUCCESS') {
+        // Handle Success
+        if ($status === 'PAYMENT_SUCCESS') {
             // Transactional Update
-            DB::transaction(function () use ($payment, $decoded) {
-                $payment->update([
-                    'status' => 'success',
-                    'phonepe_txn_id' => $decoded['data']['transactionId'] ?? null,
-                    'response_payload' => $decoded
+            try {
+                \DB::beginTransaction();
+
+                $order->update([
+                    'status' => 'completed',
+                    'provider_transaction_id' => $providerRefId,
+                    'meta' => $data
                 ]);
 
-                if ($payment->type === 'membership') {
-                    // Activate Membership
-                    $planId = $payment->meta_json['plan_id'] ?? null;
-                    if ($planId) {
-                        try {
-                            app(\App\Services\MembershipService::class)->activate(
-                                $payment->user,
-                                $planId,
-                                $payment->merchant_txn_id
-                            );
-                        } catch (\Exception $e) {
-                            Log::error('Membership Activation Failed', ['error' => $e->getMessage()]);
-                        }
-                    }
-                } else {
-                    // Default: Credit Wallet (Recharge)
-                    $this->walletService->credit(
-                        $payment->user,
-                        $payment->amount,
-                        'recharge',
-                        $payment->merchant_txn_id,
-                        'Wallet Recharge via PhonePe',
-                        ['provider_ref' => $decoded['data']['transactionId'] ?? null]
-                    );
-                }
-            });
+                // Credit Wallet
+                $this->wallet->credit(
+                    $order->user,
+                    $order->amount,
+                    'recharge',
+                    $order->id,
+                    "Wallet Recharge (Txn: $txnId)",
+                    ['provider_ref' => $providerRefId],
+                    $txnId // Idempotency
+                );
+
+                \DB::commit();
+                return response()->json(['status' => 'Success']);
+            } catch (\Exception $e) {
+                \DB::rollBack();
+                Log::error('Wallet Credit Failed: ' . $e->getMessage());
+                return response()->json(['error' => 'Internal Error'], 500);
+            }
         } else {
-            $payment->update([
-                'status' => 'failed',
-                'response_payload' => $decoded
-            ]);
+            // Failed
+            $order->update(['status' => 'failed', 'meta' => $data]);
+            return response()->json(['status' => 'Marked Failed']);
+        }
+    }
+
+    // 4. Handle Redirect (User Return)
+    public function handleRedirect(Request $request)
+    {
+        // PhonePe POSTs to this URL with code, merchantId, transactionId, etc.
+        // We generally shouldn't trust this for critical updates, but we can show status.
+        // Or we can poll our backend to see if Webhook updated it.
+
+        $code = $request->input('code');
+
+        if ($code === 'PAYMENT_SUCCESS') {
+            return redirect()->route('user.wallet')->with('success', 'Payment Successful! Wallet updated.');
         }
 
-        return response()->json(['status' => 'success']);
+        return redirect()->route('user.wallet')->with('error', 'Payment Failed or Pending.');
     }
 }

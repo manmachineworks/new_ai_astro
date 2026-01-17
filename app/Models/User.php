@@ -93,7 +93,7 @@ class User extends Authenticatable
 
     public function deviceTokens(): HasMany
     {
-        return $this->hasMany(UserDeviceToken::class);
+        return $this->hasMany(DeviceToken::class);
     }
 
     public function referralCode()

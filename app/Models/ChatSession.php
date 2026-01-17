@@ -50,4 +50,11 @@ class ChatSession extends Model
     {
         return $this->belongsTo(User::class, 'astrologer_user_id');
     }
+
+    public function getUserMaskedIdentifierAttribute()
+    {
+        // Example: User #1234
+        // If the user is deleted, return 'Unknown'
+        return $this->user ? 'User #' . $this->user->id : 'Unknown';
+    }
 }

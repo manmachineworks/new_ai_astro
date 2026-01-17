@@ -53,11 +53,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'store']); // Astrologer
     Route::get('/withdrawals', [\App\Http\Controllers\WithdrawalController::class, 'index']); // Admin
     Route::put('/withdrawals/{id}', [\App\Http\Controllers\WithdrawalController::class, 'updateStatus']); // Admin
+    // Notifications
+    Route::post('/devices/register', [\App\Http\Controllers\Api\DeviceTokenController::class, 'register']);
+    Route::post('/devices/unregister', [\App\Http\Controllers\Api\DeviceTokenController::class, 'unregister']);
+    Route::get('/notifications/preferences', [\App\Http\Controllers\Api\NotificationPreferenceController::class, 'show']);
+    Route::put('/notifications/preferences', [\App\Http\Controllers\Api\NotificationPreferenceController::class, 'update']);
 });
 
+// Internal APIs (Secured by Secret)
+Route::get('/internal/fcm-tokens', [\App\Http\Controllers\Api\InternalController::class, 'getFcmTokens']);
+
 // Webhooks
-Route::post('/webhooks/phonepe', [PaymentController::class, 'callback']);
+// Webhooks
+Route::post('/webhooks/phonepe', [\App\Http\Controllers\PaymentController::class, 'handleWebhook']);
 Route::post('/webhooks/callerdesk', [\App\Http\Controllers\CallController::class, 'webhook']);
-Route::any('/payment/redirect', function () {
-    return response()->json(['message' => 'Payment processed. Return to app.']);
-});
+Route::any('/payment/redirect', [\App\Http\Controllers\PaymentController::class, 'handleRedirect']);

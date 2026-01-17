@@ -207,16 +207,27 @@ class ChatController extends Controller
                 $commAmt = ($amount * $session->commission_percent_snapshot) / 100;
                 $session->increment('commission_amount_total', $commAmt);
 
-                // 3. Notifications Dispatch
+                // Notifications Dispatch
                 $recipientProfile = $session->astrologerProfile;
                 $recipientUser = $recipientProfile->user;
 
-                // Fetch FCM tokens (implementation assumed via a UserDevice model later or simple logging now)
-                Log::info("Chat Notification: User #{$user->id} messaged Astro #{$recipientProfile->id}");
+                // 1. User Wallet Notifications are handled by WalletService::debit
 
-                // If we had a UserDevice model with tokens:
-                // $tokens = $recipientUser->deviceTokens()->pluck('token')->toArray();
-                // foreach($tokens as $token) { $this->firebase->sendNotification($token, "New Message", $request->text ?: "You have a new message"); }
+                // 2. Notify Astrologer if User ran out of funds (Session Paused/Locked)
+                if ($user->wallet_balance < $session->price_per_message) {
+                    \App\Jobs\SendPushNotificationJob::dispatch(
+                        $recipientUser->id,
+                        'chat_session_paused',
+                        [
+                            'chat_session_id' => $session->id,
+                            'conversation_id' => $session->conversation_id,
+                            'user_name' => "User #{$user->id}",
+                            'deeplink' => "app://chat/{$session->conversation_id}"
+                        ],
+                        'Chat Paused',
+                        "User #{$user->id} has insufficient balance. Chat is paused."
+                    );
+                }
 
                 return response()->json(['success' => true]);
             });

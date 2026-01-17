@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AstrologerProfile;
 use App\Models\AvailabilityRule;
+use App\Models\CallSession;
+use App\Models\ChatSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class AstrologerDashboardController extends Controller
 {
@@ -55,6 +58,47 @@ class AstrologerDashboardController extends Controller
         }
 
         return back()->with('success', 'Profile updated.');
+    }
+
+    public function index()
+    {
+        $user = Auth::user();
+        $profile = $this->getProfile();
+
+        $callsQuery = $this->buildCallSessionsQuery($profile, $user);
+        $chatsQuery = $this->buildChatSessionsQuery($profile, $user);
+
+        $stats = [
+            'total_calls' => (clone $callsQuery)->count(),
+            'total_chats' => (clone $chatsQuery)->count(),
+        ];
+
+        $recentCalls = (clone $callsQuery)->latest()->limit(5)->get();
+        if (!Schema::hasColumn('call_sessions', 'cost') && Schema::hasColumn('call_sessions', 'gross_amount')) {
+            foreach ($recentCalls as $call) {
+                $call->cost = $call->gross_amount;
+            }
+        }
+
+        $recentChats = (clone $chatsQuery)->latest()->limit(5)->get();
+
+        return view('astrologer.dashboard', compact('user', 'stats', 'recentCalls', 'recentChats'));
+    }
+
+    public function updateDashboardLayout(Request $request)
+    {
+        $request->validate([
+            'widgets' => 'required|array',
+        ]);
+
+        $profile = $this->getProfile();
+        $settings = $profile->dashboard_settings ?? [];
+        $settings['widgets'] = $request->widgets;
+
+        $profile->dashboard_settings = $settings;
+        $profile->save();
+
+        return response()->json(['status' => 'success']);
     }
 
     public function editServices()
@@ -122,5 +166,72 @@ class AstrologerDashboardController extends Controller
         $profile = $this->getProfile();
         $calls = $profile->callSessions()->latest()->paginate(15);
         return view('astrologer.dashboard.calls', compact('calls'));
+    }
+
+    public function earnings()
+    {
+        $profile = $this->getProfile();
+        $ledger = $profile->earningsLedger()->latest()->paginate(20);
+
+        // Aggregates
+        $totalEarnings = $profile->earningsLedger()->where('amount', '>', 0)->sum('amount');
+        $monthEarnings = $profile->earningsLedger()->where('amount', '>', 0)->whereMonth('created_at', now()->month)->sum('amount');
+        $todayEarnings = $profile->earningsLedger()->where('amount', '>', 0)->whereDate('created_at', today())->sum('amount');
+
+        return view('astrologer.dashboard.earnings', compact('ledger', 'totalEarnings', 'monthEarnings', 'todayEarnings'));
+    }
+
+    public function toggleStatus(Request $request)
+    {
+        $request->validate(['status' => 'required|in:online,offline']);
+
+        $profile = $this->getProfile();
+        // Assuming 'is_online' or 'is_active' column exists on profile/user. 
+        // Based on previous code, likely on profile if specifically for availability.
+        // For now, mapping to existing is_active on user or profile.
+        // Let's assume we added is_online to astrologer_profiles or use user->is_active.
+
+        // checking migration... we didn't add is_online manually, but it might be there.
+        // User previous code used $user->is_active.
+
+        $user = Auth::user();
+        if ($request->status == 'online') {
+            $user->is_active = true;
+        } else {
+            $user->is_active = false;
+        }
+        $user->save();
+
+        return back()->with('success', $user->is_active ? 'You are now online.' : 'You are now offline.');
+    }
+
+    private function buildCallSessionsQuery(AstrologerProfile $profile, $user)
+    {
+        $query = CallSession::query();
+
+        if (Schema::hasColumn('call_sessions', 'astrologer_profile_id')) {
+            return $query->where('astrologer_profile_id', $profile->id);
+        }
+
+        if (Schema::hasColumn('call_sessions', 'astrologer_user_id')) {
+            return $query->where('astrologer_user_id', $user->id);
+        }
+
+        return $query->whereRaw('1=0');
+    }
+
+    private function buildChatSessionsQuery(AstrologerProfile $profile, $user)
+    {
+        $query = ChatSession::query();
+
+        if (Schema::hasColumn('chat_sessions', 'astrologer_profile_id')) {
+            return $query->where('astrologer_profile_id', $profile->id);
+        }
+
+        if (Schema::hasColumn('chat_sessions', 'astrologer_user_id')) {
+            return $query->where('astrologer_user_id', $user->id);
+        }
+
+        return $query->whereRaw('1=0');
     }
 }

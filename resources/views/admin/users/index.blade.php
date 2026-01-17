@@ -1,54 +1,156 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Users')
-@section('page_title', 'User Management')
+@section('title', 'User Management')
 
 @section('content')
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <table class="table table-sm align-middle">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Wallet</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($users as $user)
-                        <tr>
-                            <td>{{ $user->name ?? '-' }}</td>
-                            <td>{{ $user->phone }}</td>
-                            <td>{{ $user->roles->pluck('name')->implode(', ') ?: 'User' }}</td>
-                            <td>
-                                @if($user->is_active)
-                                    <span class="badge text-bg-success">Active</span>
-                                @else
-                                    <span class="badge text-bg-danger">Blocked</span>
-                                @endif
-                            </td>
-                            <td>{{ number_format($user->wallet_balance, 2) }}</td>
-                            <td class="text-end">
-                                <a class="btn btn-sm btn-outline-secondary" href="{{ route('admin.users.edit', $user) }}">Edit</a>
-                                @can('block_users')
-                                    <form method="POST" action="{{ route('admin.users.toggle', $user) }}" class="d-inline">
-                                        @csrf
-                                        @method('PATCH')
-                                        <button class="btn btn-sm btn-outline-warning" onclick="return confirm('Toggle user status?')">
-                                            Toggle
-                                        </button>
-                                    </form>
-                                @endcan
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-
-            {{ $users->links() }}
-        </div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold m-0 text-dark">User Management</h2>
+        <a href="{{ route('admin.users.index') }}" class="btn btn-primary rounded-pill px-4 disabled">
+            <i class="fas fa-user-plus me-2"></i>Create User
+        </a>
     </div>
+
+    <x-admin.filter-bar :action="route('admin.users.index')" :filters="['date', 'status', 'export', 'search']" />
+
+    <form action="{{ route('admin.users.bulk_action') }}" method="POST" id="bulkActionForm">
+        @csrf
+        <div class="card shadow-sm border-0 rounded-4 mb-3" id="bulkActionsCard" style="display:none;">
+            <div class="card-body py-2 d-flex align-items-center justify-content-between bg-light rounded-4">
+                <div class="d-flex align-items-center">
+                    <span class="fw-bold me-3 text-primary"><span id="selectedCount">0</span> Selected</span>
+                    <select name="action" class="form-select form-select-sm border-0 bg-white shadow-sm"
+                        style="width: 200px;" required>
+                        <option value="">Choose Action...</option>
+                        <option value="activate">Bulk Activate</option>
+                        <option value="deactivate">Bulk Deactivate</option>
+                        <option value="export">Export Selected</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-dark btn-sm rounded-pill px-4"
+                    onclick="return confirm('Are you sure you want to perform this bulk action?');">Apply</button>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4" style="width: 50px;">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="selectAll">
+                                </div>
+                            </th>
+                            <th>User</th>
+                            <th>Wallet</th>
+                            <th>Status</th>
+                            <th>Registered</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($users as $user)
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input user-checkbox" type="checkbox" name="ids[]"
+                                            value="{{ $user->id }}">
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
+                                            style="width: 40px; height: 40px; font-size: 1rem;">
+                                            {{ substr($user->name, 0, 1) }}
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">{{ $user->name }}</div>
+                                            <div class="small text-muted">{{ $user->email }}</div>
+                                            <div class="small text-muted">{{ $user->phone }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">₹{{ number_format($user->wallet_balance, 2) }}</div>
+                                </td>
+                                <td>
+                                    @if($user->is_active)
+                                        <span class="badge bg-success-subtle text-success rounded-pill px-3">Active</span>
+                                    @else
+                                        <span class="badge bg-danger-subtle text-danger rounded-pill px-3">Banned</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="small text-muted">{{ $user->created_at->format('M d, Y') }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-light rounded-circle" type="button"
+                                            data-bs-toggle="dropdown">
+                                            <i class="fas fa-ellipsis-v text-muted"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end border-0 shadow rounded-4">
+                                            <li><a class="dropdown-item" href="{{ route('admin.users.edit', $user) }}"><i
+                                                        class="fas fa-edit me-2 text-primary"></i> Edit</a></li>
+                                            <li><a class="dropdown-item" href="{{ route('admin.wallets.show', $user->id) }}"><i
+                                                        class="fas fa-wallet me-2 text-warning"></i> Wallet</a></li>
+                                            <li>
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                            <li>
+                                                <!-- Standard Single Toggle -->
+                                                {{-- Use JS to submit or separate form --}}
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="text-muted mb-2"><i class="fas fa-users-slash fa-3x opacity-25"></i></div>
+                                    <p class="text-muted">No users found matching your filters.</p>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            @if($users->hasPages())
+                <div class="card-footer bg-white border-0 py-3">
+                    {{ $users->links() }}
+                </div>
+            @endif
+        </div>
+    </form>
+
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const selectAll = document.getElementById('selectAll');
+                const checkboxes = document.querySelectorAll('.user-checkbox');
+                const bulkActionsCard = document.getElementById('bulkActionsCard');
+                const selectedCountSpan = document.getElementById('selectedCount');
+
+                function updateBulkUI() {
+                    const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
+                    selectedCountSpan.textContent = checkedCount;
+                    if (checkedCount > 0) {
+                        bulkActionsCard.style.display = 'block';
+                    } else {
+                        bulkActionsCard.style.display = 'none';
+                    }
+                }
+
+                selectAll.addEventListener('change', function () {
+                    checkboxes.forEach(cb => cb.checked = this.checked);
+                    updateBulkUI();
+                });
+
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', updateBulkUI);
+                });
+            });
+        </script>
+    @endpush
 @endsection

@@ -23,9 +23,9 @@
                     <h6 class="text-uppercase text-muted small mb-3">Wallet Balance</h6>
                     <h2 class="display-5 fw-bold text-gold mb-4">₹ {{ number_format($balance, 2) }}</h2>
                     <div class="d-grid">
-                        <button class="btn btn-cosmic" data-bs-toggle="modal" data-bs-target="#rechargeModal">
+                        <a href="{{ route('wallet.show') }}" class="btn btn-cosmic">
                             <i class="fas fa-plus-circle me-2"></i> Add Money
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -102,29 +102,5 @@
         </div>
     </div>
 
-    <!-- Recharge Modal -->
-    <div class="modal fade" id="rechargeModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content glass-card border-0">
-                <div class="modal-header border-0">
-                    <h5 class="modal-title">Add Money to Wallet</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label text-muted">Amount (₹)</label>
-                        <input type="number" id="rechargeAmount" class="form-control form-control-cosmic form-control-lg"
-                            placeholder="100" min="10">
-                    </div>
-                    <div class="d-grid">
-                    <form action="{{ route('wallet.recharge') }}" method="POST">
-                        @csrf
-                        <input type="hidden" name="amount" id="formAmount">
-                        <button type="submit" class="btn btn-cosmic w-100" onclick="document.getElementById('formAmount').value = document.getElementById('rechargeAmount').value">Proceed to Pay</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
 @endsection

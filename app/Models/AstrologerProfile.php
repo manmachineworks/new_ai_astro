@@ -40,7 +40,8 @@ class AstrologerProfile extends Model
         'admin_notes',
         'verified_by_admin_id',
         'verified_at',
-        'rejection_reason'
+        'rejection_reason',
+        'dashboard_settings'
     ];
 
     protected $casts = [
@@ -48,6 +49,7 @@ class AstrologerProfile extends Model
         'specialties' => 'array',
         'languages' => 'array',
         'profile_fields' => 'array',
+        'dashboard_settings' => 'array',
         'dob' => 'date',
         'visibility' => 'boolean',
         'show_on_front' => 'boolean',
@@ -99,5 +101,9 @@ class AstrologerProfile extends Model
     public function earningsLedger(): HasMany
     {
         return $this->hasMany(AstrologerEarningsLedger::class);
+    }
+    public function chatSessions(): HasMany
+    {
+        return $this->hasMany(ChatSession::class);
     }
 }

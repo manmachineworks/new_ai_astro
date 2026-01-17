@@ -19,7 +19,9 @@ class PaymentOrder extends Model
         'status',
         'payment_url',
         'redirect_url',
-        'meta'
+        'meta',
+        'admin_note',
+        'admin_note_status',
     ];
 
     protected $casts = [

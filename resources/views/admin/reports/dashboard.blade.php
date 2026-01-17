@@ -1,184 +1,136 @@
-@extends('admin.layouts.app')
+﻿@extends('admin.layouts.app')
 
-@section('title', 'Marketplace Analytics')
+@section('title', 'Reports & Analytics')
 
 @section('content')
     <div class="container-fluid py-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold m-0"><i class="fas fa-chart-line me-2 text-primary"></i>Analytics Overview</h2>
-
-            <form action="{{ route('admin.reports.dashboard') }}" method="GET"
-                class="d-flex gap-2 align-items-center bg-white p-2 rounded-4 shadow-sm">
-                <select name="preset" class="form-select form-select-sm border-0 bg-light rounded-pill px-3"
-                    onchange="this.form.submit()">
-                    <option value="today" {{ $filters['preset'] == 'today' ? 'selected' : '' }}>Today</option>
-                    <option value="yesterday" {{ $filters['preset'] == 'yesterday' ? 'selected' : '' }}>Yesterday</option>
-                    <option value="last_7_days" {{ $filters['preset'] == 'last_7_days' ? 'selected' : '' }}>Last 7 Days
-                    </option>
-                    <option value="last_30_days" {{ $filters['preset'] == 'last_30_days' ? 'selected' : '' }}>Last 30 Days
-                    </option>
-                    <option value="this_month" {{ $filters['preset'] == 'this_month' ? 'selected' : '' }}>This Month</option>
-                </select>
-                <input type="date" name="start_date"
-                    class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
-                    value="{{ $filters['start']->toDateString() }}">
-                <span class="text-muted small">to</span>
-                <input type="date" name="end_date" class="form-control form-control-sm border-0 bg-light rounded-pill px-3"
-                    value="{{ $filters['end']->toDateString() }}">
-                <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">Filter</button>
-            </form>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="fw-bold m-0">Reports & Analytics</h2>
+                <div class="text-muted small">All dates displayed in IST</div>
+            </div>
         </div>
 
-        <!-- KPI Cards -->
+        <x-admin.report-tabs />
+
+        <x-admin.report-filters :action="route('admin.reports.dashboard')" :range="$range" />
+
         <div class="row g-4 mb-4">
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between mb-3">
-                            <div class="bg-primary-subtle p-3 rounded-4"><i class="fas fa-wallet text-primary"></i></div>
-                            <span class="text-success small fw-bold"><i class="fas fa-arrow-up"></i> Gross</span>
-                        </div>
-                        <h3 class="fw-bold mb-1">₹{{ number_format($totalGross, 2) }}</h3>
-                        <p class="text-muted small mb-0">Total Marketplace Revenue</p>
-                    </div>
-                </div>
+                <x-admin.kpi-card
+                    title="Total Gross Revenue"
+                    value="INR {{ number_format($totalGross, 2) }}"
+                    icon="fas fa-wallet"
+                    variant="primary"
+                    :href="route('admin.reports.revenue', request()->query())" />
             </div>
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between mb-3">
-                            <div class="bg-success-subtle p-3 rounded-4"><i class="fas fa-percent text-success"></i></div>
-                            <span class="text-primary small fw-bold">Platform</span>
-                        </div>
-                        <h3 class="fw-bold mb-1">₹{{ number_format($totalComm, 2) }}</h3>
-                        <p class="text-muted small mb-0">Total Commission Earned</p>
-                    </div>
-                </div>
+                <x-admin.kpi-card
+                    title="Platform Commission"
+                    value="INR {{ number_format($totalComm, 2) }}"
+                    icon="fas fa-percent"
+                    variant="success"
+                    :href="route('admin.reports.revenue', request()->query())" />
             </div>
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between mb-3">
-                            <div class="bg-info-subtle p-3 rounded-4"><i class="fas fa-hand-holding-usd text-info"></i>
-                            </div>
-                            <span class="text-info small fw-bold">Success Rate:
-                                {{ number_format($rechargeRate, 1) }}%</span>
-                        </div>
-                        <h3 class="fw-bold mb-1">₹{{ number_format($rechargeTotal, 2) }}</h3>
-                        <p class="text-muted small mb-0">Wallet Recharge Volume</p>
-                    </div>
-                </div>
+                <x-admin.kpi-card
+                    title="Astrologer Earnings"
+                    value="INR {{ number_format($totalEarn, 2) }}"
+                    icon="fas fa-hand-holding-usd"
+                    variant="info"
+                    :href="route('admin.reports.revenue', request()->query())" />
             </div>
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between mb-3">
-                            <div class="bg-warning-subtle p-3 rounded-4"><i class="fas fa-users text-warning"></i></div>
-                            <span class="text-warning small fw-bold">New: {{ $metrics->total_new_users ?? 0 }}</span>
-                        </div>
-                        <h3 class="fw-bold mb-1">{{ number_format($metrics->peak_active_users ?? 0) }}</h3>
-                        <p class="text-muted small mb-0">Peak Active Users</p>
-                    </div>
-                </div>
+                <x-admin.kpi-card
+                    title="Wallet Recharges (Success)"
+                    value="INR {{ number_format($rechargeTotal, 2) }}"
+                    icon="fas fa-bolt"
+                    variant="warning"
+                    subtitle="Rate: {{ number_format($rechargeRate, 1) }}%"
+                    :href="route('admin.reports.recharges', array_merge(request()->query(), ['status' => 'success']))" />
+            </div>
+            <div class="col-md-3">
+                <x-admin.kpi-card
+                    title="Refunds"
+                    value="INR {{ number_format($refundsTotal, 2) }}"
+                    icon="fas fa-rotate-left"
+                    variant="danger"
+                    :href="route('admin.reports.refunds', request()->query())" />
+            </div>
+            <div class="col-md-3">
+                <x-admin.kpi-card
+                    title="Active Users"
+                    value="{{ number_format($activeUsers) }}"
+                    icon="fas fa-user-check"
+                    variant="primary"
+                    :href="route('admin.users.index', ['date_from' => $range['start_ist']->toDateString(), 'date_to' => $range['end_ist']->toDateString()])" />
+            </div>
+            <div class="col-md-3">
+                <x-admin.kpi-card
+                    title="New Users"
+                    value="{{ number_format($newUsers) }}"
+                    icon="fas fa-user-plus"
+                    variant="success"
+                    :href="route('admin.users.index', ['date_from' => $range['start_ist']->toDateString(), 'date_to' => $range['end_ist']->toDateString()])" />
             </div>
         </div>
 
-        <!-- Charts -->
         <div class="row g-4 mb-4">
-            <div class="col-md-8">
+            <div class="col-lg-7">
                 <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-header bg-white border-0 py-4 px-4">
-                        <h5 class="fw-bold m-0">Revenue Trends</h5>
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold m-0">Revenue Trend (Calls / Chats / AI)</h5>
+                        <a href="{{ route('admin.reports.revenue', request()->query()) }}" class="btn btn-light btn-sm rounded-pill px-3">View Details</a>
                     </div>
-                    <div class="card-body p-4">
-                        <canvas id="revenueChart" style="height: 350px;"></canvas>
+                    <div class="card-body">
+                        <canvas id="revenueTrend"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-lg-5">
                 <div class="card border-0 shadow-sm rounded-4 h-100">
-                    <div class="card-header bg-white border-0 py-4 px-4">
-                        <h5 class="fw-bold m-0">Service Breakdown</h5>
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold m-0">Recharge Success vs Failed</h5>
+                        <a href="{{ route('admin.reports.recharges', request()->query()) }}" class="btn btn-light btn-sm rounded-pill px-3">View Details</a>
                     </div>
-                    <div class="card-body p-4 d-flex align-items-center">
-                        <canvas id="breakdownChart"></canvas>
+                    <div class="card-body">
+                        <canvas id="rechargeTrend"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Detailed Summaries -->
         <div class="row g-4">
-            <div class="col-md-6">
+            <div class="col-12">
                 <div class="card border-0 shadow-sm rounded-4">
-                    <div class="card-header bg-white border-0 py-4 px-4 d-flex justify-content-between align-items-center">
-                        <h5 class="fw-bold m-0">Revenue by Category</h5>
-                        <a href="{{ route('admin.reports.revenue') }}" class="btn btn-light btn-sm rounded-pill px-3">View
-                            Details</a>
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold m-0">Top Astrologers by Earnings</h5>
+                        <a href="{{ route('admin.reports.astrologers') }}" class="btn btn-light btn-sm rounded-pill px-3">View Leaderboard</a>
                     </div>
                     <div class="card-body p-0">
-                        <table class="table align-middle mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-4">Category</th>
-                                    <th>Gross</th>
-                                    <th>Commission</th>
-                                    <th class="pe-4 text-end">Net (Astro)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="ps-4 fw-bold"><i class="fas fa-phone me-2 text-primary"></i>Calls</td>
-                                    <td>₹{{ number_format($metrics->call_gross ?? 0, 2) }}</td>
-                                    <td>₹{{ number_format($metrics->call_commission ?? 0, 2) }}</td>
-                                    <td class="pe-4 text-end">₹{{ number_format($metrics->call_earnings ?? 0, 2) }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4 fw-bold"><i class="fas fa-comments me-2 text-success"></i>Human Chat
-                                    </td>
-                                    <td>₹{{ number_format($metrics->chat_gross ?? 0, 2) }}</td>
-                                    <td>₹{{ number_format($metrics->chat_commission ?? 0, 2) }}</td>
-                                    <td class="pe-4 text-end">₹{{ number_format($metrics->chat_earnings ?? 0, 2) }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="ps-4 fw-bold"><i class="fas fa-robot me-2 text-info"></i>AI Chat</td>
-                                    <td>₹{{ number_format($metrics->ai_gross ?? 0, 2) }}</td>
-                                    <td>₹{{ number_format($metrics->ai_commission ?? 0, 2) }}</td>
-                                    <td class="pe-4 text-end">₹{{ number_format($metrics->ai_earnings ?? 0, 2) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card border-0 shadow-sm rounded-4">
-                    <div class="card-header bg-white border-0 py-4 px-4 d-flex justify-content-between align-items-center">
-                        <h5 class="fw-bold m-0">Platform Health</h5>
-                    </div>
-                    <div class="card-body p-4">
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between mb-1">
-                                <span class="small fw-bold">Recharge Success Rate</span>
-                                <span class="small fw-bold text-success">{{ number_format($rechargeRate, 1) }}%</span>
-                            </div>
-                            <div class="progress rounded-pill" style="height: 10px;">
-                                <div class="progress-bar bg-success" style="width: {{ $rechargeRate }}%"></div>
-                            </div>
-                        </div>
-                        <div class="row text-center g-3">
-                            <div class="col-6">
-                                <div class="bg-light p-3 rounded-4">
-                                    <div class="text-muted small mb-1">Successful Recharges</div>
-                                    <h4 class="fw-bold m-0 text-success">{{ $metrics->recharge_count_ok ?? 0 }}</h4>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="bg-light p-3 rounded-4">
-                                    <div class="text-muted small mb-1">Failed Recharges</div>
-                                    <h4 class="fw-bold m-0 text-danger">{{ $metrics->recharge_count_fail ?? 0 }}</h4>
-                                </div>
-                            </div>
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="ps-4">Astrologer</th>
+                                        <th>Email</th>
+                                        <th class="text-end pe-4">Earnings</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($topAstrologers as $astro)
+                                        <tr>
+                                            <td class="ps-4 fw-bold">{{ $astro->astrologer_name }}</td>
+                                            <td class="text-muted">{{ $astro->astrologer_email }}</td>
+                                            <td class="text-end pe-4 fw-bold">INR {{ number_format($astro->total_earnings, 2) }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted py-4">No earnings data for this range.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -188,74 +140,52 @@
 @endsection
 
 @section('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        const chartLabels = {!! json_encode($chartData->pluck('date_ist')->map(fn($d) => $d->format('d M'))) !!};
-        const callData = {!! json_encode($chartData->pluck('call_gross')) !!};
-        const chatData = {!! json_encode($chartData->pluck('chat_gross')) !!};
-        const aiData = {!! json_encode($chartData->pluck('ai_gross')) !!};
+        const trendLabels = {!! json_encode($revenueTrend->pluck('date_ist')->map(fn($d) => $d->format('d M'))) !!};
+        const callSeries = {!! json_encode($revenueTrend->pluck('call_gross')) !!};
+        const chatSeries = {!! json_encode($revenueTrend->pluck('chat_gross')) !!};
+        const aiSeries = {!! json_encode($revenueTrend->pluck('ai_gross')) !!};
 
-        const ctx = document.getElementById('revenueChart').getContext('2d');
-        new Chart(ctx, {
+        const revenueCtx = document.getElementById('revenueTrend').getContext('2d');
+        new Chart(revenueCtx, {
             type: 'line',
             data: {
-                labels: chartLabels,
+                labels: trendLabels,
                 datasets: [
-                    {
-                        label: 'Voice Calls',
-                        data: callData,
-                        borderColor: '#4e73df',
-                        backgroundColor: 'rgba(78, 115, 223, 0.05)',
-                        fill: true,
-                        tension: 0.3
-                    },
-                    {
-                        label: 'Human Chat',
-                        data: chatData,
-                        borderColor: '#1cc88a',
-                        backgroundColor: 'rgba(28, 200, 138, 0.05)',
-                        fill: true,
-                        tension: 0.3
-                    },
-                    {
-                        label: 'AI Chat',
-                        data: aiData,
-                        borderColor: '#36b9cc',
-                        backgroundColor: 'rgba(54, 185, 204, 0.05)',
-                        fill: true,
-                        tension: 0.3
-                    }
+                    { label: 'Calls', data: callSeries, borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.15)', fill: true, tension: 0.3 },
+                    { label: 'Chats', data: chatSeries, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', fill: true, tension: 0.3 },
+                    { label: 'AI', data: aiSeries, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.15)', fill: true, tension: 0.3 },
                 ]
             },
             options: {
-                maintainAspectRatio: false,
+                responsive: true,
                 plugins: { legend: { position: 'bottom' } },
-                scales: {
-                    y: { beginAtZero: true, grid: { drawBorder: false } },
-                    x: { grid: { display: false } }
-                }
+                scales: { y: { beginAtZero: true } }
             }
         });
 
-        const breakdownCtx = document.getElementById('breakdownChart').getContext('2d');
-        new Chart(breakdownCtx, {
-            type: 'doughnut',
+        const rechargeLabels = {!! json_encode($rechargeTrend->pluck('date_ist')->map(fn($d) => $d->format('d M'))) !!};
+        const rechargeSuccess = {!! json_encode($rechargeTrend->pluck('wallet_recharge_count_success')) !!};
+        const rechargeFailed = {!! json_encode($rechargeTrend->pluck('wallet_recharge_count_failed')) !!};
+
+        const rechargeCtx = document.getElementById('rechargeTrend').getContext('2d');
+        new Chart(rechargeCtx, {
+            type: 'bar',
             data: {
-                labels: ['Calls', 'Human Chat', 'AI Chat'],
-                datasets: [{
-                    data: [
-                        {{ $metrics->call_gross ?? 0 }},
-                        {{ $metrics->chat_gross ?? 0 }},
-                        {{ $metrics->ai_gross ?? 0 }}
-                    ],
-                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc'],
-                    hoverOffset: 10
-                }]
+                labels: rechargeLabels,
+                datasets: [
+                    { label: 'Success', data: rechargeSuccess, backgroundColor: '#10b981' },
+                    { label: 'Failed', data: rechargeFailed, backgroundColor: '#ef4444' }
+                ]
             },
             options: {
-                plugins: { legend: { position: 'bottom' } }
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
             }
         });
-
     </script>
 @endsection
+
+
+

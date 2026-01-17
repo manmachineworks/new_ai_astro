@@ -1,90 +1,66 @@
-@extends('layouts.app')
+@extends('layouts.astrologer')
 
-@section('title', 'Availability Manager')
+@section('title', 'Availability')
+@section('page-title', 'Availability Schedule')
 
 @section('content')
-    <div class="container py-4">
-        <div class="row">
-            <div class="col-md-3">
-                @include('astrologer.dashboard.nav')
-            </div>
-            <div class="col-md-9">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Weekly Availability (UTC)</h5>
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyToAll()">Copy Mon to
-                            All</button>
-                    </div>
-                    <div class="card-body">
-                        @if(session('success'))
-                            <div class="alert alert-success">{{ session('success') }}</div>
-                        @endif
-
-                        <form action="{{ route('astrologer.availability.update') }}" method="POST">
-                            @csrf
-                            <div class="table-responsive">
-                                <table class="table align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Active</th>
-                                            <th>Day</th>
-                                            <th>Start Time (UTC)</th>
-                                            <th>End Time (UTC)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @php $days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; @endphp
-                                        @foreach($days as $idx => $day)
-                                            @php $rule = $rules[$idx] ?? null; @endphp
-                                            <tr>
-                                                <td>
-                                                    <div class="form-check form-switch">
-                                                        <input class="form-check-input" type="checkbox"
-                                                            name="schedule[{{ $idx }}][active]" value="1" {{ $rule && $rule->is_active ? 'checked' : '' }}>
-                                                    </div>
-                                                </td>
-                                                <td class="fw-medium">{{ $day }}</td>
-                                                <td>
-                                                    <input type="time" name="schedule[{{ $idx }}][start]"
-                                                        class="form-control form-control-sm time-start"
-                                                        value="{{ $rule ? \Carbon\Carbon::parse($rule->start_time_utc)->format('H:i') : '09:00' }}">
-                                                </td>
-                                                <td>
-                                                    <input type="time" name="schedule[{{ $idx }}][end]"
-                                                        class="form-control form-control-sm time-end"
-                                                        value="{{ $rule ? \Carbon\Carbon::parse($rule->end_time_utc)->format('H:i') : '17:00' }}">
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="d-flex justify-content-end p-2">
-                                <button type="submit" class="btn btn-primary">Update Schedule</button>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="card-footer bg-light text-muted small">
-                        <i class="fas fa-info-circle me-1"></i> Ensure you set times in UTC. Your profile will convert these
-                        to the user's local timezone automatically.
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <form action="{{ route('astrologer.availability.update') }}" method="POST">
+            @csrf
+            
+            <div class="card card-premium mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2 text-primary"></i>Weekly Schedule</h6>
+                    <div class="small text-muted mt-1">Set your standard availability hours. All times are in UTC.</div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small text-muted">
+                                <tr>
+                                    <th class="ps-4 border-0" style="width: 150px;">Day</th>
+                                    <th class="border-0 text-center" style="width: 100px;">Active</th>
+                                    <th class="border-0">Start Time</th>
+                                    <th class="border-0">End Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as $day)
+                                    @php
+                                        $rule = $rules[$day] ?? null;
+                                        $isActive = $rule ? $rule->is_active : false;
+                                        $start = $rule ? $rule->start_time_utc : '09:00';
+                                        $end = $rule ? $rule->end_time_utc : '17:00';
+                                    @endphp
+                                    <tr class="{{ $isActive ? '' : 'bg-light opacity-75' }}">
+                                        <td class="ps-4 fw-bold text-dark">{{ $day }}</td>
+                                        <td class="text-center">
+                                            <div class="form-check form-switch d-inline-block">
+                                                <input class="form-check-input" type="checkbox" name="schedule[{{ $day }}][active]" 
+                                                       {{ $isActive ? 'checked' : '' }} onchange="this.closest('tr').classList.toggle('bg-light'); this.closest('tr').classList.toggle('opacity-75');">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <input type="time" name="schedule[{{ $day }}][start]" class="form-control" value="{{ $start }}">
+                                        </td>
+                                        <td>
+                                            <input type="time" name="schedule[{{ $day }}][end]" class="form-control" value="{{ $end }}">
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-        </div>
+
+            <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary px-5 rounded-pill shadow-sm">
+                    Save Schedule
+                </button>
+            </div>
+        </form>
     </div>
-
-    <script>
-        function copyToAll() {
-            const mondayStart = document.querySelector('input[name="schedule[1][start]"]').value;
-            const mondayEnd = document.querySelector('input[name="schedule[1][end]"]').value;
-            const mondayActive = document.querySelector('input[name="schedule[1][active]"]').checked;
-
-            document.querySelectorAll('tbody tr').forEach((row, idx) => {
-                if (idx === 1) return; // Skip Monday
-                row.querySelector('.time-start').value = mondayStart;
-                row.querySelector('.time-end').value = mondayEnd;
-                row.querySelector('.form-check-input').checked = mondayActive;
-            });
-        }
-    </script>
+</div>
 @endsection
