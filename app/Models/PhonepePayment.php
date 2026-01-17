@@ -15,12 +15,15 @@ class PhonepePayment extends Model
         'phonepe_txn_id',
         'amount',
         'status',
+        'type',
+        'meta_json',
         'request_payload',
         'response_payload',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'meta_json' => 'array',
         'request_payload' => 'array',
         'response_payload' => 'array',
     ];

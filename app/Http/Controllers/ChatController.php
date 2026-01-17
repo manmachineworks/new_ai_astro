@@ -15,10 +15,12 @@ use Illuminate\Support\Str;
 class ChatController extends Controller
 {
     protected $firebase;
+    protected $membershipService;
 
-    public function __construct(FirebaseService $firebase)
+    public function __construct(FirebaseService $firebase, \App\Services\MembershipService $membershipService)
     {
         $this->firebase = $firebase;
+        $this->membershipService = $membershipService;
     }
 
     public function index(Request $request)
@@ -43,9 +45,6 @@ class ChatController extends Controller
         return view('astrologer.dashboard.chats', compact('sessions', 'profile'));
     }
 
-    /**
-     * Show a specific chat thread
-     */
     public function show(Request $request, $conversationId)
     {
         $session = ChatSession::where('conversation_id', $conversationId)
@@ -63,9 +62,6 @@ class ChatController extends Controller
         return view('user.chats.show', compact('session'));
     }
 
-    /**
-     * Mint custom token for the current user
-     */
     public function firebaseToken(Request $request)
     {
         $user = $request->user();
@@ -80,9 +76,7 @@ class ChatController extends Controller
         return response()->json(['firebase_token' => $token, 'uid' => $uid]);
     }
 
-    /**
-     * Start/fetch a chat session
-     */
+    // start method modification
     public function start(Request $request)
     {
         $request->validate(['astrologer_id' => 'required|exists:astrologer_profiles,id']);
@@ -107,16 +101,22 @@ class ChatController extends Controller
             ->first();
 
         if (!$session) {
+            // Calculate Price with Membership Discount
+            $basePrice = $astro->chat_per_session > 0 ? $astro->chat_per_session : config('firebase.billing.price_per_message');
+            $discountData = $this->membershipService->calculateDiscount($user, 'chat', $basePrice);
+            $finalPrice = $discountData['final_amount'];
+
             $session = ChatSession::create([
                 'user_id' => $user->id,
                 'astrologer_profile_id' => $astro->id,
                 'conversation_id' => 'conv_' . Str::random(20),
                 'pricing_mode' => 'per_message',
-                'price_per_message' => $astro->chat_per_session > 0 ? $astro->chat_per_session : config('firebase.billing.price_per_message'),
+                'price_per_message' => $finalPrice,
                 'status' => 'active',
                 'started_at' => now(),
             ]);
 
+            // Should logging occur?
             // Initialization in Firestore would ideally happen here via service account
             // but rules allow participants to proceed if they have the ID.
         }

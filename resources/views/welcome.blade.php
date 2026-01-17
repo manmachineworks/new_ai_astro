@@ -49,8 +49,13 @@
     <div class="py-5">
         <div class="container">
             <div class="text-center mb-5">
-                <h2 class="fw-bold">Meet Our <span class="text-gold">Top Experts</span></h2>
+                <h2 class="fw-bold">{!! $sectionTitle ?? 'Meet Our <span class="text-gold">Top Experts</span>' !!}</h2>
                 <p class="text-muted">Available now for instant consultation</p>
+                @auth
+                    <a href="{{ route('user.preferences.edit') }}" class="btn btn-sm btn-outline-warning rounded-pill mt-2">
+                        <i class="fas fa-sliders-h me-1"></i> Customize Feed
+                    </a>
+                @endauth
             </div>
 
             <div class="row g-4 justify-content-center">
@@ -59,44 +64,50 @@
                         <div class="glass-card h-100 p-0 overflow-hidden">
                             <div class="p-4 text-center">
                                 <div class="position-relative d-inline-block d-flex justify-content-center">
-                                    <img src="{{ $astro->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($astro->name) . '&background=FFD700&color=000' }}"
+                                    <img src="{{ $astro->profile_photo_path ?? $astro->user->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($astro->display_name ?? $astro->user->name) . '&background=FFD700&color=000' }}"
                                         class="rounded-circle border border-2 border-warning mb-3" width="80" height="80">
-                                    @if($astro->is_active)
+
+                                    @if($astro->recommendation_reasons)
+                                        <div
+                                            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
+                                            {{ $astro->recommendation_reasons[0] }}
+                                        </div>
+                                    @endif
+
+                                    @if($astro->is_enabled)
+                                        {{-- Assuming is_enabled maps to active status/presence for now --}}
                                         <span
                                             class="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle p-2"
                                             title="Online"></span>
-                                    @else
-                                        <span
-                                            class="position-absolute bottom-0 end-0 bg-secondary border border-dark rounded-circle p-2"
-                                            title="Offline"></span>
                                     @endif
                                 </div>
-                                <h5>{{ $astro->name }}</h5>
+                                <h5>{{ $astro->display_name ?? $astro->user->name }}</h5>
                                 <p class="text-gold small mb-2">
-                                    {{ implode(', ', array_slice($astro->astrologerProfile->skills ?? [], 0, 3)) }}
+                                    {{ implode(', ', array_slice($astro->skills ?? [], 0, 3)) }}
                                 </p>
                                 <p class="small text-muted mb-3 line-clamp-2" style="min-height: 48px">
-                                    {{ Str::limit($astro->astrologerProfile->bio, 80) }}
+                                    {{ Str::limit($astro->bio, 80) }}
                                 </p>
 
                                 <div class="d-flex justify-content-center gap-2">
                                     <span class="badge bg-white-10 text-white border border-white-10">
-                                        <i class="fas fa-phone me-1"></i> ₹{{ $astro->astrologerProfile->call_per_minute }}/min
+                                        <i class="fas fa-phone me-1"></i> ₹{{ (int) $astro->call_per_minute }}/min
                                     </span>
                                     <span class="badge bg-white-10 text-white border border-white-10">
                                         <i class="fas fa-comment me-1"></i>
-                                        ₹{{ $astro->astrologerProfile->chat_per_session }}/min
+                                        ₹{{ (int) $astro->chat_per_session }}/min
                                     </span>
                                 </div>
                             </div>
                             <div class="card-footer bg-white-05 border-top border-white-10 p-3">
-                                <a href="{{ route('astrologers.index') }}" class="btn btn-sm btn-cosmic w-100">Consult Now</a>
+                                <a href="{{ route('astrologers.public_show', $astro->id) }}"
+                                    class="btn btn-sm btn-cosmic w-100">Consult Now</a>
                             </div>
                         </div>
                     </div>
                 @empty
                     <div class="col-12 text-center">
-                        <p class="text-muted">No astrologers currently featured.</p>
+                        <p class="text-muted">No astrologers currently available.</p>
                     </div>
                 @endforelse
             </div>

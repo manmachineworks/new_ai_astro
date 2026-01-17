@@ -5,6 +5,7 @@ use App\Http\Controllers\FirebaseExampleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
+Route::view('/offline', 'offline')->name('offline');
 Route::get('/auth/login', function () {
     return redirect()->route('auth.phone.show');
 })->name('login');
@@ -31,6 +32,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/chats/{session}/authorize-send', [App\Http\Controllers\ChatController::class, 'authorizeSend'])->name('chats.authorize');
     Route::post('/chats/{session}/confirm-sent', [App\Http\Controllers\ChatController::class, 'confirmSent'])->name('chats.confirm');
     Route::post('/devices/register-token', [App\Http\Controllers\DeviceController::class, 'registerToken'])->name('devices.register');
+    Route::post('/devices/revoke-token', [App\Http\Controllers\DeviceController::class, 'revokeToken'])->name('devices.revoke');
 
     // AI Chat
     Route::get('/ai-chat', [App\Http\Controllers\AiChatController::class, 'index'])->name('user.ai_chat.index');
@@ -123,5 +125,34 @@ Route::get('/health/queue', [App\Http\Controllers\HealthController::class, 'queu
 
 // Language Switching
 Route::post('/locale/switch', [App\Http\Controllers\LocaleController::class, 'switch'])->name('locale.switch');
+
+// CMS Pages
+Route::get('/pages/{slug}', [App\Http\Controllers\CmsController::class, 'show'])->name('cms.page');
+
+
+// Public Blog
+Route::get('/blog', [App\Http\Controllers\BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/category/{slug}', [App\Http\Controllers\BlogController::class, 'category'])->name('blog.category');
+Route::get('/blog/{slug}', [App\Http\Controllers\BlogController::class, 'show'])->name('blog.show');
+
+// User Preferences
+Route::middleware('auth')->group(function () {
+    Route::get('/preferences', [App\Http\Controllers\UserPreferenceController::class, 'edit'])->name('user.preferences.edit');
+    Route::post('/preferences', [App\Http\Controllers\UserPreferenceController::class, 'update'])->name('user.preferences.update');
+});
+
+// Search & Ask
+Route::get('/api/search', [App\Http\Controllers\SearchController::class, 'search'])->name('api.search');
+Route::post('/api/ask', [App\Http\Controllers\SearchController::class, 'ask'])->name('api.ask');
+
+// Memberships
+Route::middleware('auth')->group(function () {
+    Route::get('/memberships', [App\Http\Controllers\MembershipController::class, 'index'])->name('memberships.index');
+    Route::get('/user/membership', [App\Http\Controllers\MembershipController::class, 'myMembership'])->name('memberships.my');
+    Route::post('/memberships/checkout/{plan}', [App\Http\Controllers\MembershipController::class, 'checkout'])->name('memberships.checkout');
+});
+
+// Deep Linking
+Route::get('/dl/{type}/{id}', [App\Http\Controllers\DeepLinkController::class, 'handle'])->name('deeplink');
 
 require __DIR__ . '/admin.php';

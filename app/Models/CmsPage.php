@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class CmsPage extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'slug',
         'title',
@@ -16,42 +19,23 @@ class CmsPage extends Model
         'locale',
         'status',
         'published_at',
+        'created_by_admin_id'
     ];
 
     protected $casts = [
         'published_at' => 'datetime',
     ];
 
-    // Scopes
-    public function scopePublished($query)
-    {
-        return $query->where('status', 'published')
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now());
-    }
+    protected $keyType = 'string';
+    public $incrementing = false;
 
-    public function scopeForLocale($query, $locale = null)
-    {
-        $locale = $locale ?? app()->getLocale();
-        return $query->where('locale', $locale);
-    }
-
-    // Cache helpers
-    public function getCacheKey()
-    {
-        return "cms_page:{$this->locale}:{$this->slug}";
-    }
-
-    public static function boot()
+    protected static function boot()
     {
         parent::boot();
-
-        static::saved(function ($page) {
-            Cache::forget($page->getCacheKey());
-        });
-
-        static::deleted(function ($page) {
-            Cache::forget($page->getCacheKey());
+        static::creating(function ($model) {
+            if (empty($model->id)) {
+                $model->id = (string) Str::uuid();
+            }
         });
     }
 }

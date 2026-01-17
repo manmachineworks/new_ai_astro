@@ -119,6 +119,23 @@
             </div>
         </div>
     </div>
+    </div>
+</div>
+
+<!-- Mobile Sticky CTA -->
+<div class="fixed-bottom d-md-none bg-white border-top p-3 shadow-lg" style="bottom: 56px; z-index: 1040;">
+    <div class="d-flex gap-2">
+        <button class="btn btn-success flex-grow-1 rounded-pill" 
+                {{ !$astrologer->is_call_enabled ? 'disabled' : '' }}
+                onclick="startGate('call')">
+            <i class="fas fa-phone-alt me-1"></i> Call (₹{{ (int)$astrologer->call_per_minute }})
+        </button>
+        <button class="btn btn-primary flex-grow-1 rounded-pill" 
+                {{ !$astrologer->is_chat_enabled ? 'disabled' : '' }}
+                onclick="startGate('chat')">
+            <i class="fas fa-comment-dots me-1"></i> Chat (₹{{ (int)$astrologer->chat_per_session }})
+        </button>
+    </div>
 </div>
 
 <script>

@@ -135,15 +135,31 @@ class PaymentController extends Controller
                     'response_payload' => $decoded
                 ]);
 
-                // Credit Wallet
-                $this->walletService->credit(
-                    $payment->user,
-                    $payment->amount,
-                    'recharge',
-                    $payment->merchant_txn_id,
-                    'Wallet Recharge via PhonePe',
-                    ['provider_ref' => $decoded['data']['transactionId'] ?? null]
-                );
+                if ($payment->type === 'membership') {
+                    // Activate Membership
+                    $planId = $payment->meta_json['plan_id'] ?? null;
+                    if ($planId) {
+                        try {
+                            app(\App\Services\MembershipService::class)->activate(
+                                $payment->user,
+                                $planId,
+                                $payment->merchant_txn_id
+                            );
+                        } catch (\Exception $e) {
+                            Log::error('Membership Activation Failed', ['error' => $e->getMessage()]);
+                        }
+                    }
+                } else {
+                    // Default: Credit Wallet (Recharge)
+                    $this->walletService->credit(
+                        $payment->user,
+                        $payment->amount,
+                        'recharge',
+                        $payment->merchant_txn_id,
+                        'Wallet Recharge via PhonePe',
+                        ['provider_ref' => $decoded['data']['transactionId'] ?? null]
+                    );
+                }
             });
         } else {
             $payment->update([

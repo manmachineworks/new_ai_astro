@@ -9,9 +9,17 @@ use App\Http\Controllers\Admin\CallController;
 use App\Http\Controllers\Admin\AppointmentController;
 use App\Http\Controllers\Admin\ReportingController;
 
+use App\Http\Controllers\Admin\AdminAuthController;
+
+// Guest Admin Routes
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/login', [AdminAuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
+});
+
 Route::middleware(['auth', 'role:Admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-    Route::post('/logout', [\App\Http\Controllers\PhoneAuthController::class, 'logout'])->name('logout');
+    Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
     // Payments Audit
     Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
@@ -101,4 +109,31 @@ Route::middleware(['auth', 'role:Admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/{id}/reject', [App\Http\Controllers\Admin\DisputeController::class, 'reject'])->name('reject');
     });
 
+
+    // Content CMS
+    Route::prefix('cms')->name('cms.')->group(function () {
+        Route::resource('pages', \App\Http\Controllers\Admin\CmsPageController::class);
+        Route::resource('banners', \App\Http\Controllers\Admin\CmsBannerController::class)->except(['show']);
+        Route::resource('faqs', \App\Http\Controllers\Admin\FaqController::class)->except(['show']);
+        // Featured Astrologers
+        Route::get('/featured', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'index'])->name('featured.index');
+        Route::post('/featured', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'store'])->name('featured.store');
+        Route::delete('/featured/{featured}', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'destroy'])->name('featured.destroy');
+        Route::post('/featured/reorder', [\App\Http\Controllers\Admin\FeaturedAstrologerController::class, 'updateOrder'])->name('featured.reorder');
+
+        // Blog
+        Route::resource('blog/posts', \App\Http\Controllers\Admin\BlogController::class, ['as' => 'blog']);
+        Route::resource('blog/categories', \App\Http\Controllers\Admin\BlogCategoryController::class, ['as' => 'blog']);
+        Route::resource('blog/categories', \App\Http\Controllers\Admin\BlogCategoryController::class, ['as' => 'blog']);
+    });
+
+    // Recommendations Settings
+    Route::prefix('recommendations')->name('recommendations.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\RecommendationController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Admin\RecommendationController::class, 'update'])->name('update');
+        Route::get('/preview', [\App\Http\Controllers\Admin\RecommendationController::class, 'preview'])->name('preview');
+    });
+
+    // Membership Plans
+    Route::resource('memberships/plans', \App\Http\Controllers\Admin\MembershipPlanController::class, ['as' => 'memberships']);
 });

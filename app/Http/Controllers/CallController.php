@@ -15,11 +15,13 @@ class CallController extends Controller
 {
     protected $callerDesk;
     protected $walletService;
+    protected $membershipService;
 
-    public function __construct(CallerDeskService $callerDesk, WalletService $walletService)
+    public function __construct(CallerDeskService $callerDesk, WalletService $walletService, \App\Services\MembershipService $membershipService)
     {
         $this->callerDesk = $callerDesk;
         $this->walletService = $walletService;
+        $this->membershipService = $membershipService;
     }
 
     public function initiate(Request $request)
@@ -49,10 +51,13 @@ class CallController extends Controller
             ], 402);
         }
 
-        // Calculate Hold Amount (e.g. 5 mins)
-        $rate = $profile->call_per_minute;
+        // Calculate Rate and Hold Amount
+        $baseRate = $profile->call_per_minute;
+        $discountData = $this->membershipService->calculateDiscount($user, 'call', $baseRate);
+        $finalRate = $discountData['final_amount'];
+
         $holdDuration = \App\Models\PricingSetting::get('call_hold_duration_minutes', 5);
-        $holdAmount = $rate * $holdDuration;
+        $holdAmount = $finalRate * $holdDuration;
 
         if (!$this->walletService->hasBalance($user, $holdAmount)) {
             return response()->json(['message' => "Insufficient wallet balance for initial {$holdDuration} mins"], 402);
@@ -73,9 +78,9 @@ class CallController extends Controller
             'user_id' => $user->id,
             'astrologer_user_id' => $astrologer->id,
             'status' => 'initiated',
-            'rate_per_minute' => $rate,
+            'rate_per_minute' => $finalRate,
             'callerdesk_call_id' => $callId,
-            'meta' => ['wallet_hold_id' => $hold->id], // Store hold Ref
+            'meta' => ['wallet_hold_id' => $hold->id, 'discount_applied' => $discountData['discount'] > 0 ? $discountData : null],
         ]);
 
         // Initiate Call

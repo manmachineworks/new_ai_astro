@@ -12,3 +12,4 @@ Artisan::command('inspire', function () {
 Schedule::job(new \App\Jobs\ChatBillingJob)->everyMinute();
 Schedule::command('appointments:reminders')->everyMinute();
 Schedule::command('slots:generate')->dailyAt('00:30');
+Schedule::command('memberships:expire')->daily();

@@ -55,6 +55,27 @@ class User extends Authenticatable
     ];
 
 
+    public function preferences(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(UserPreference::class);
+    }
+
+    public function memberships()
+    {
+        return $this->hasMany(UserMembership::class);
+    }
+
+    public function activeMembership()
+    {
+        return $this->hasOne(UserMembership::class)
+            ->where('status', 'active')
+            ->where(function ($query) {
+                $query->whereNull('ends_at_utc')
+                    ->orWhere('ends_at_utc', '>', now());
+            })
+            ->latest('created_at'); // In case of duplicate actives, take newest
+    }
+
     public function callSessions(): HasMany
     {
         return $this->hasMany(CallSession::class);

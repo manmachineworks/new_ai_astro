@@ -12,6 +12,8 @@ class UserDeviceToken extends Model
         'token',
         'platform',
         'last_seen_at',
+        'status', // active, revoked
+        'last_token_refresh_at',
     ];
 
     protected $casts = [
