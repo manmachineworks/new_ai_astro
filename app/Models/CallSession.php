@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CallSession extends Model
 {
-    use HasUuids;
 
     protected $fillable = [
         'user_id',
@@ -29,7 +28,8 @@ class CallSession extends Model
         'user_masked_identifier',
         'astrologer_masked_identifier',
         'meta_json',
-        'settled_at'
+        'settled_at',
+        'commission_percent_snapshot',
     ];
 
     protected $casts = [
@@ -38,6 +38,7 @@ class CallSession extends Model
         'ended_at_utc' => 'datetime',
         'meta_json' => 'array',
         'settled_at' => 'datetime',
+        'commission_percent_snapshot' => 'float',
     ];
 
     public function user(): BelongsTo

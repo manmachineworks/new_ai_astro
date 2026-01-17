@@ -32,6 +32,37 @@
                                 value="{{ $settings['min_wallet_to_start_chat'] ?? 30 }}" step="0.01">
                         </div>
 
+                        <h6 class="text-primary mt-4 border-bottom pb-2">Platform Commission (%)</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Voice Calls Commission</label>
+                                <div class="input-group">
+                                    <input type="number" name="platform_commission_percent_calls" class="form-control"
+                                        value="{{ $settings['platform_commission_percent_calls'] ?? 20 }}" min="0" max="100"
+                                        step="1">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Human Chat Commission</label>
+                                <div class="input-group">
+                                    <input type="number" name="platform_commission_percent_chat" class="form-control"
+                                        value="{{ $settings['platform_commission_percent_chat'] ?? 15 }}" min="0" max="100"
+                                        step="1">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">AI Chat Commission</label>
+                                <div class="input-group">
+                                    <input type="number" name="ai_chat_platform_commission_percent" class="form-control"
+                                        value="{{ $settings['ai_chat_platform_commission_percent'] ?? 10 }}" min="0"
+                                        max="100" step="1">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <h6 class="text-primary mt-4 border-bottom pb-2">AI Services</h6>
                         <div class="mb-3">
                             <label class="form-label">AI Chat Price (Per Message) (₹)</label>

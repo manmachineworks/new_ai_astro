@@ -28,6 +28,7 @@ class User extends Authenticatable
         'is_active',
         'firebase_uid',
         'last_seen_at',
+        'preferred_locale',
     ];
 
     /**
@@ -53,10 +54,6 @@ class User extends Authenticatable
         'last_seen_at' => 'datetime',
     ];
 
-    public function hasRole($role): bool
-    {
-        return $this->roles->contains('name', $role);
-    }
 
     public function callSessions(): HasMany
     {
@@ -66,5 +63,30 @@ class User extends Authenticatable
     public function astrologerProfile()
     {
         return $this->hasOne(AstrologerProfile::class);
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(UserDeviceToken::class);
+    }
+
+    public function referralCode()
+    {
+        return $this->hasOne(\App\Models\ReferralCode::class);
+    }
+
+    public function referralsAsInviter()
+    {
+        return $this->hasMany(\App\Models\Referral::class, 'inviter_user_id');
+    }
+
+    public function referralAsInvitee()
+    {
+        return $this->hasOne(\App\Models\Referral::class, 'invitee_user_id');
     }
 }

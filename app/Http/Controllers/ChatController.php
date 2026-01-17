@@ -203,6 +203,10 @@ class ChatController extends Controller
                 $session->increment('total_messages_user');
                 $session->increment('total_charged', $amount);
 
+                // Update commission
+                $commAmt = ($amount * $session->commission_percent_snapshot) / 100;
+                $session->increment('commission_amount_total', $commAmt);
+
                 // 3. Notifications Dispatch
                 $recipientProfile = $session->astrologerProfile;
                 $recipientUser = $recipientProfile->user;

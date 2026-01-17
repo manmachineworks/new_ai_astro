@@ -13,9 +13,17 @@
                 class="nav-link {{ request()->routeIs('astrologer.availability') ? 'active' : '' }}">
                 <i class="fas fa-clock me-2"></i> Availability
             </a>
+            <a href="{{ route('astrologer.appointments.index') }}"
+                class="nav-link {{ request()->routeIs('astrologer.appointments.*') ? 'active' : '' }}">
+                <i class="fas fa-calendar-check me-2"></i> Appointments
+            </a>
             <a href="{{ route('astrologer.calls') }}"
                 class="nav-link {{ request()->routeIs('astrologer.calls') ? 'active' : '' }}">
                 <i class="fas fa-phone me-2"></i> Call History
+            </a>
+            <a href="{{ route('astrologer.appointments.index') }}"
+                class="nav-link {{ request()->routeIs('astrologer.appointments.*') ? 'active' : '' }}">
+                <i class="fas fa-calendar-check me-2"></i> Appointments
             </a>
             <a href="{{ route('astrologer.chats') }}"
                 class="nav-link {{ request()->routeIs('astrologer.chats') ? 'active' : '' }}">

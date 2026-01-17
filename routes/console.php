@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::job(new \App\Jobs\ChatBillingJob)->everyMinute();
+Schedule::command('appointments:reminders')->everyMinute();
+Schedule::command('slots:generate')->dailyAt('00:30');

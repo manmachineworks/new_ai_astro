@@ -86,6 +86,16 @@ class AstrologerProfile extends Model
         return $this->hasMany(CallSession::class);
     }
 
+    public function appointmentSlots(): HasMany
+    {
+        return $this->hasMany(AppointmentSlot::class);
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
     public function earningsLedger(): HasMany
     {
         return $this->hasMany(AstrologerEarningsLedger::class);

@@ -32,11 +32,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/chats/{session}/confirm-sent', [App\Http\Controllers\ChatController::class, 'confirmSent'])->name('chats.confirm');
     Route::post('/devices/register-token', [App\Http\Controllers\DeviceController::class, 'registerToken'])->name('devices.register');
 
-    Route::middleware('role:Astrologer')->group(function () {
-        Route::get('/ai-chat', function () {
-            return view('ai-chat');
-        })->name('ai.chat.view');
-    });
+    // AI Chat
+    Route::get('/ai-chat', [App\Http\Controllers\AiChatController::class, 'index'])->name('user.ai_chat.index');
+    Route::post('/ai-chat/start', [App\Http\Controllers\AiChatController::class, 'start'])->name('user.ai_chat.start');
+    Route::get('/ai-chat/{session}', [App\Http\Controllers\AiChatController::class, 'show'])->name('user.ai_chat.show');
+    Route::post('/ai-chat/{session}/message', [App\Http\Controllers\AiChatController::class, 'sendMessage'])->name('user.ai_chat.send');
+    Route::post('/ai-chat/message/{id}/report', [App\Http\Controllers\AiChatController::class, 'reportMessage'])->name('user.ai_chat.report');
+
+    // Horoscopes
+    Route::get('/horoscope', [App\Http\Controllers\HoroscopeController::class, 'index'])->name('user.horoscope.index');
+    Route::get('/horoscope/daily', [App\Http\Controllers\HoroscopeController::class, 'daily'])->name('user.horoscope.daily');
+    Route::get('/horoscope/weekly', [App\Http\Controllers\HoroscopeController::class, 'weekly'])->name('user.horoscope.weekly');
+    Route::get('/kundli', [App\Http\Controllers\HoroscopeController::class, 'kundliForm'])->name('user.kundli.form');
+    Route::post('/kundli', [App\Http\Controllers\HoroscopeController::class, 'getKundli'])->name('user.kundli.get');
 
     Route::post('/auth/logout', [PhoneAuthController::class, 'logout'])->name('auth.logout');
 
@@ -55,8 +63,51 @@ Route::middleware('auth')->group(function () {
         Route::post('/availability', [App\Http\Controllers\AstrologerDashboardController::class, 'updateAvailability'])->name('availability.update');
         Route::get('/calls', [App\Http\Controllers\AstrologerDashboardController::class, 'calls'])->name('calls');
         Route::get('/chats', [App\Http\Controllers\ChatController::class, 'astrologerIndex'])->name('chats');
+
+        // Astrologer Appointments
+        Route::get('/appointments', [App\Http\Controllers\AstrologerAppointmentController::class, 'index'])->name('appointments.index');
+        Route::post('/appointments/{id}/confirm', [App\Http\Controllers\AstrologerAppointmentController::class, 'confirm'])->name('appointments.confirm');
+        Route::post('/appointments/{id}/decline', [App\Http\Controllers\AstrologerAppointmentController::class, 'decline'])->name('appointments.decline');
+        Route::post('/appointments/{id}/cancel', [App\Http\Controllers\AstrologerAppointmentController::class, 'cancel'])->name('appointments.cancel');
+        Route::get('/slots', [App\Http\Controllers\AstrologerAppointmentController::class, 'slots'])->name('slots.index');
+        Route::post('/slots/{id}/block', [App\Http\Controllers\AstrologerAppointmentController::class, 'blockSlot'])->name('slots.block');
+        Route::post('/slots/{id}/unblock', [App\Http\Controllers\AstrologerAppointmentController::class, 'unblockSlot'])->name('slots.unblock');
+    });
+
+    // User Appointments (authenticated users)
+    Route::get('/appointments', [App\Http\Controllers\AppointmentController::class, 'index'])->name('appointments.index');
+    Route::get('/appointments/{id}', [App\Http\Controllers\AppointmentController::class, 'show'])->name('appointments.show');
+    Route::post('/appointments/hold', [App\Http\Controllers\AppointmentController::class, 'hold'])->name('appointments.hold');
+    Route::post('/appointments', [App\Http\Controllers\AppointmentController::class, 'store'])->name('appointments.store');
+    Route::post('/appointments/{id}/cancel', [App\Http\Controllers\AppointmentController::class, 'cancel'])->name('appointments.cancel');
+
+    // Promo & Referral Routes
+    Route::prefix('api')->group(function () {
+        Route::post('/promos/validate', [App\Http\Controllers\PromoController::class, 'validate'])->name('promos.validate');
+        Route::get('/promos/first-time-eligible', [App\Http\Controllers\PromoController::class, 'checkFirstTimeEligible'])->name('promos.first_time');
+        Route::get('/referrals/code', [App\Http\Controllers\PromoController::class, 'getReferralCode'])->name('referrals.code');
+        Route::get('/referrals/stats', [App\Http\Controllers\PromoController::class, 'getReferralStats'])->name('referrals.stats');
+    });
+
+    // Support Tickets
+    Route::prefix('support')->name('support.')->group(function () {
+        Route::get('/', [App\Http\Controllers\SupportTicketController::class, 'index'])->name('index');
+        Route::post('/', [App\Http\Controllers\SupportTicketController::class, 'store'])->name('store');
+        Route::get('/{id}', [App\Http\Controllers\SupportTicketController::class, 'show'])->name('show');
+        Route::post('/{id}/messages', [App\Http\Controllers\SupportTicketController::class, 'addMessage'])->name('add_message');
+    });
+
+    // Disputes
+    Route::prefix('disputes')->name('disputes.')->group(function () {
+        Route::get('/', [App\Http\Controllers\DisputeController::class, 'index'])->name('index');
+        Route::get('/check-eligibility', [App\Http\Controllers\DisputeController::class, 'checkEligibility'])->name('check_eligibility');
+        Route::post('/', [App\Http\Controllers\DisputeController::class, 'store'])->name('store');
+        Route::get('/{id}', [App\Http\Controllers\DisputeController::class, 'show'])->name('show');
     });
 });
+
+// Public appointment slot listing
+Route::get('/astrologers/{id}/appointment-slots', [App\Http\Controllers\AppointmentController::class, 'listSlots'])->name('appointments.list_slots');
 
 Route::get('/astrologers', [App\Http\Controllers\AstrologerDirectoryController::class, 'index'])->name('astrologers.index');
 Route::get('/astrologers/{id}', [App\Http\Controllers\AstrologerDirectoryController::class, 'show'])->name('astrologers.public_show');
@@ -65,5 +116,12 @@ Route::post('/api/astrologers/{id}/gate/{type}', [App\Http\Controllers\Astrologe
 Route::post('/webhooks/callerdesk', [\App\Http\Controllers\WebhookController::class, 'handleCallerDesk'])->name('webhooks.callerdesk');
 
 Route::get('/firebase/health', [FirebaseExampleController::class, 'health'])->name('firebase.health');
+
+Route::get('/health', [App\Http\Controllers\HealthController::class, 'index'])->name('health');
+Route::get('/health/db', [App\Http\Controllers\HealthController::class, 'database'])->name('health.db');
+Route::get('/health/queue', [App\Http\Controllers\HealthController::class, 'queue'])->name('health.queue');
+
+// Language Switching
+Route::post('/locale/switch', [App\Http\Controllers\LocaleController::class, 'switch'])->name('locale.switch');
 
 require __DIR__ . '/admin.php';

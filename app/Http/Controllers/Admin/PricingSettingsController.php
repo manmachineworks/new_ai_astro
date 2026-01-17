@@ -32,6 +32,9 @@ class PricingSettingsController extends Controller
             'min_wallet_to_start_call' => 'required|numeric|min:0',
             'min_wallet_to_start_chat' => 'required|numeric|min:0',
             'ai_chat_price_per_message' => 'required|numeric|min:0',
+            'platform_commission_percent_calls' => 'required|numeric|min:0|max:100',
+            'platform_commission_percent_chat' => 'required|numeric|min:0|max:100',
+            'ai_chat_platform_commission_percent' => 'required|numeric|min:0|max:100',
         ]);
 
         foreach ($validated as $key => $value) {

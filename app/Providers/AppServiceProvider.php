@@ -24,5 +24,8 @@ class AppServiceProvider extends ServiceProvider
     {
         \Illuminate\Support\Facades\Schema::defaultStringLength(191);
         Gate::policy(User::class, UserPolicy::class);
+
+        // Register observers
+        User::observe(\App\Observers\UserObserver::class);
     }
 }

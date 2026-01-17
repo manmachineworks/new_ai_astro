@@ -27,6 +27,8 @@ class ChatSession extends Model
         'rate_per_minute',
         'cost',
         'firebase_chat_id',
+        'commission_percent_snapshot',
+        'commission_amount_total',
     ];
 
     protected $casts = [
@@ -35,6 +37,8 @@ class ChatSession extends Model
         'last_billed_at' => 'datetime',
         'rate_per_minute' => 'decimal:2',
         'cost' => 'decimal:2',
+        'commission_percent_snapshot' => 'float',
+        'commission_amount_total' => 'float',
     ];
 
     public function user()

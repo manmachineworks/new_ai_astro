@@ -20,11 +20,15 @@ class AiChatSession extends Model
         'ended_at',
         'total_messages',
         'total_charged',
+        'commission_percent_snapshot',
+        'commission_amount_total',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
+        'commission_percent_snapshot' => 'float',
+        'commission_amount_total' => 'float',
     ];
 
     public function user()
