@@ -58,6 +58,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/devices/unregister', [\App\Http\Controllers\Api\DeviceTokenController::class, 'unregister']);
     Route::get('/notifications/preferences', [\App\Http\Controllers\Api\NotificationPreferenceController::class, 'show']);
     Route::put('/notifications/preferences', [\App\Http\Controllers\Api\NotificationPreferenceController::class, 'update']);
+
+    // In-App Inbox
+    Route::prefix('inbox')->group(function () {
+        Route::get('/notifications', [App\Http\Controllers\Api\InboxController::class, 'index']);
+        Route::post('/notifications/read-all', [App\Http\Controllers\Api\InboxController::class, 'markAllRead']);
+        Route::post('/notifications/{id}/read', [App\Http\Controllers\Api\InboxController::class, 'markRead']);
+        Route::post('/notifications/{id}/archive', [App\Http\Controllers\Api\InboxController::class, 'archive']);
+
+        // Tracking
+        Route::post('/notifications/{id}/opened', [App\Http\Controllers\Api\TrackingController::class, 'openInbox']);
+        Route::post('/push/opened', [App\Http\Controllers\Api\TrackingController::class, 'openPush']);
+    });
 });
 
 // Internal APIs (Secured by Secret)

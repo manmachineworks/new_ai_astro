@@ -51,6 +51,22 @@ class TopicSubscriptionService
     }
 
     /**
+     * Subscribe to generic role topic (e.g. role_user, role_astrologer) for broadcasts.
+     */
+    public function subscribeToRoleTopic(string $token, string $role): void
+    {
+        // Normalize role: User -> role_user, Astrologer -> role_astrologer
+        $normalized = 'role_' . strtolower($role);
+        $this->subscribe($token, $normalized);
+    }
+
+    public function unsubscribeFromRoleTopic(string $token, string $role): void
+    {
+        $normalized = 'role_' . strtolower($role);
+        $this->unsubscribe($token, $normalized);
+    }
+
+    /**
      * Subscribe to Admin Broadcasts (optional, for admin users)
      */
     public function subscribeToAdminBroadcast(string $token): void

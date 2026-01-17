@@ -60,6 +60,10 @@ class DeviceTokenController extends Controller
             \Log::warning("Firestore Token Sync Failed: " . $e->getMessage());
         }
 
+        // SYNC TOPICS (Queue)
+        $role = $user->getRoleNames()->first() ?? 'user';
+        \App\Jobs\SyncFCMTopicsJob::dispatch($request->fcm_token, $user->id, $role, 'subscribe');
+
         return response()->json([
             'message' => 'Device token registered successfully',
             'data' => $token
@@ -77,7 +81,7 @@ class DeviceTokenController extends Controller
             ->where('fcm_token', $request->fcm_token)
             ->delete();
 
-        // Remove from Firestore
+        // 1. Remove from Firestore
         try {
             app('firebase.firestore')->database()
                 ->collection('device_tokens')
@@ -88,6 +92,10 @@ class DeviceTokenController extends Controller
         } catch (\Exception $e) {
             \Log::warning("Firestore Token Delete Failed: " . $e->getMessage());
         }
+
+        // 2. Unsubscribe from Topics (Queue)
+        $role = $request->user()->getRoleNames()->first() ?? 'user';
+        \App\Jobs\SyncFCMTopicsJob::dispatch($request->fcm_token, $request->user()->id, $role, 'unsubscribe');
 
         return response()->json(['message' => 'Device token unregistered']);
     }

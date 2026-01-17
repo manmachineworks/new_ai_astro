@@ -18,7 +18,8 @@ class WebhookEvent extends Model
         'headers',
         'processed_at',
         'processing_status',
-        'error_message'
+        'error_message',
+        'attempts'
     ];
 
     protected $casts = [
@@ -26,5 +27,6 @@ class WebhookEvent extends Model
         'headers' => 'json',
         'signature_valid' => 'boolean',
         'processed_at' => 'datetime',
+        'attempts' => 'integer',
     ];
 }
