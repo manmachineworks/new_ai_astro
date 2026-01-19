@@ -66,6 +66,14 @@ class PhoneAuthController extends Controller
             }
         }
 
+        if ($user->is_active === false) {
+            return $this->errorResponse($request, 'Your account is inactive. Please contact support.', 403);
+        }
+
+        if ($user->blocked_until && $user->blocked_until->isFuture()) {
+            return $this->errorResponse($request, 'Your account is blocked. Please contact support.', 403);
+        }
+
         Auth::login($user);
         $request->session()->regenerate();
 

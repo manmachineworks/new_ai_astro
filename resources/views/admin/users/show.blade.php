@@ -26,6 +26,15 @@
                         <span
                             class="badge bg-{{ $user->is_active ? 'success' : 'danger' }}">{{ $user->is_active ? 'Active' : 'Banned' }}</span>
                     </div>
+                    @if(!$user->is_active)
+                        <div class="alert alert-warning small mb-3">
+                            <div class="fw-bold">Blocked</div>
+                            <div>Until: {{ $user->blocked_until ? $user->blocked_until->format('M d, Y H:i') : 'Indefinite' }}</div>
+                            @if($user->blocked_reason)
+                                <div class="mt-1">Reason: {{ $user->blocked_reason }}</div>
+                            @endif
+                        </div>
+                    @endif
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Joined</span>
                         <span>{{ $user->created_at->format('M d, Y') }}</span>
@@ -45,13 +54,42 @@
                         <a href="{{ route('admin.users.edit', $user->id) }}" class="btn btn-outline-primary">Edit
                             Profile</a>
 
-                        <form action="{{ route('admin.users.toggle', $user->id) }}" method="POST" class="d-block"
-                            onsubmit="return confirm('Confirm action?')">
-                            @csrf
-                            <button
-                                class="btn btn-outline-danger w-100">{{ $user->is_active ? 'Block User' : 'Unblock User' }}</button>
-                        </form>
+                        @if($user->is_active)
+                            <button class="btn btn-outline-danger w-100" data-bs-toggle="modal"
+                                data-bs-target="#blockUserModal">Block User</button>
+                        @else
+                            <form action="{{ route('admin.users.unblock', $user->id) }}" method="POST" class="d-block"
+                                data-confirm data-confirm-title="Unblock User"
+                                data-confirm-text="Unblock this user and restore access?">
+                                @csrf
+                                <button class="btn btn-outline-success w-100">Unblock User</button>
+                            </form>
+                        @endif
                     </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">AI Chat Restrictions</div>
+                <div class="card-body">
+                    @if($aiRestriction)
+                        <div class="alert alert-warning small">
+                            <div class="fw-bold">AI Chat Blocked</div>
+                            <div>Until: {{ $aiRestriction->expires_at ? $aiRestriction->expires_at->format('M d, Y H:i') : 'Indefinite' }}</div>
+                            @if(!empty($aiRestriction->meta_json['reason']))
+                                <div class="mt-1">Reason: {{ $aiRestriction->meta_json['reason'] }}</div>
+                            @endif
+                        </div>
+                        <form action="{{ route('admin.users.ai_chat.unblock', $user->id) }}" method="POST"
+                            data-confirm data-confirm-title="Lift AI Chat Restriction"
+                            data-confirm-text="Allow AI chat access for this user?">
+                            @csrf
+                            <button class="btn btn-outline-success w-100">Lift Restriction</button>
+                        </form>
+                    @else
+                        <button class="btn btn-outline-warning w-100" data-bs-toggle="modal"
+                            data-bs-target="#aiBlockModal">Restrict AI Chat</button>
+                    @endif
                 </div>
             </div>
 
@@ -89,12 +127,25 @@
                             <button class="nav-link" id="chats-tab" data-bs-toggle="tab" data-bs-target="#chats"
                                 type="button">Chat History</button>
                         </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="ai-tab" data-bs-toggle="tab" data-bs-target="#ai"
+                                type="button">AI Chat</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="appointments-tab" data-bs-toggle="tab"
+                                data-bs-target="#appointments" type="button">Appointments</button>
+                        </li>
                     </ul>
                 </div>
                 <div class="card-body">
                     <div class="tab-content" id="myTabContent">
                         <!-- Wallet Tab -->
                         <div class="tab-pane fade show active" id="wallet" role="tabpanel">
+                            <div class="d-flex justify-content-end mb-2">
+                                <a href="{{ route('admin.finance.wallets.show', $user->id) }}" class="btn btn-sm btn-outline-secondary">
+                                    View Full Ledger
+                                </a>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover">
                                     <thead>
@@ -173,8 +224,8 @@
                                         @forelse($chatSessions as $chat)
                                             <tr>
                                                 <td>{{ $chat->created_at->format('M d H:i') }}</td>
-                                                <td>-</td>
-                                                <td>{{ $chat->amount_charged ?? 0 }}</td>
+                                                <td>{{ ($chat->total_messages_user ?? 0) + ($chat->total_messages_astrologer ?? 0) }}</td>
+                                                <td>{{ $chat->total_charged ?? 0 }}</td>
                                                 <td><span class="badge bg-secondary">{{ $chat->status ?? 'N/A' }}</span></td>
                                             </tr>
                                         @empty
@@ -186,9 +237,129 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- AI Chats Tab -->
+                        <div class="tab-pane fade" id="ai" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Messages</th>
+                                            <th>Charged</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($aiSessions as $session)
+                                            <tr>
+                                                <td>{{ $session->created_at->format('M d H:i') }}</td>
+                                                <td>{{ $session->total_messages ?? 0 }}</td>
+                                                <td>{{ $session->total_charged ?? 0 }}</td>
+                                                <td><span class="badge bg-secondary">{{ $session->status }}</span></td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted">No AI sessions found</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Appointments Tab -->
+                        <div class="tab-pane fade" id="appointments" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Astrologer</th>
+                                            <th>Status</th>
+                                            <th>Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($appointments as $appointment)
+                                            <tr>
+                                                <td>{{ $appointment->created_at->format('M d H:i') }}</td>
+                                                <td>{{ $appointment->astrologerProfile?->display_name ?? 'Astrologer' }}</td>
+                                                <td><span class="badge bg-secondary">{{ $appointment->status }}</span></td>
+                                                <td>{{ $appointment->price_total ?? 0 }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted">No appointments found</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Block User Modal -->
+    <div class="modal fade" id="blockUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form action="{{ route('admin.users.block', $user->id) }}" method="POST" class="modal-content">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Block User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Reason</label>
+                        <textarea name="reason" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Duration (minutes)</label>
+                        <input type="number" name="duration_minutes" class="form-control" min="1" placeholder="e.g., 1440">
+                        <div class="form-text">Leave empty to use a specific blocked-until date.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Blocked Until</label>
+                        <input type="datetime-local" name="blocked_until" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Block User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- AI Chat Restriction Modal -->
+    <div class="modal fade" id="aiBlockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form action="{{ route('admin.users.ai_chat.block', $user->id) }}" method="POST" class="modal-content">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Restrict AI Chat</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Reason (optional)</label>
+                        <textarea name="reason" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Duration (minutes)</label>
+                        <input type="number" name="duration_minutes" class="form-control" min="1"
+                            placeholder="e.g., 1440">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Apply Restriction</button>
+                </div>
+            </form>
         </div>
     </div>
 @endsection

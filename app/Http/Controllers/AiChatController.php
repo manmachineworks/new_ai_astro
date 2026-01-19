@@ -7,6 +7,7 @@ use App\Models\AiChatMessage;
 use App\Models\AiMessageCharge;
 use App\Models\AiChatReport;
 use App\Models\PricingSetting;
+use App\Models\UserSecurityFlag;
 use App\Services\AstrologyApiClient;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
@@ -27,11 +28,111 @@ class AiChatController extends Controller
         $this->membershipService = $membershipService;
     }
 
-    // ... (index and start methods unchanged for now, assume free messages apply per message) ...
+    public function index(Request $request)
+    {
+        $sessions = AiChatSession::where('user_id', $request->user()->id)
+            ->latest()
+            ->paginate(20);
 
-    public function sendMessage(Request $request, AiChatSession $session)
+        return view('user.ai_chat.index', compact('sessions'));
+    }
+
+    public function show(Request $request, AiChatSession $session)
     {
         $this->authorizeAccess($session);
+
+        $messages = $session->messages()
+            ->orderBy('created_at')
+            ->get();
+
+        return view('user.ai_chat.show', compact('session', 'messages'));
+    }
+
+    public function start(Request $request)
+    {
+        $user = $request->user();
+        $blockResponse = $this->guardAiChat($request);
+        if ($blockResponse) {
+            return $blockResponse;
+        }
+
+        $pricingMode = PricingSetting::get('ai_chat_pricing_mode', 'per_message');
+        $pricePerMessage = (float) PricingSetting::get('ai_chat_price_per_message', 10);
+        $sessionPrice = (float) PricingSetting::get('ai_chat_price_per_session', 150);
+        $minWallet = (float) PricingSetting::get('ai_chat_min_wallet_to_start', 50);
+        $commissionSnapshot = (float) PricingSetting::get('platform_commission_percent', 20);
+
+        if ($user->wallet_balance < $minWallet) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => 'Insufficient wallet balance'], 402);
+            }
+            return redirect()->route('wallet.recharge');
+        }
+
+        if ($pricingMode === 'per_session' && $user->wallet_balance < $sessionPrice) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => 'Insufficient wallet balance'], 402);
+            }
+            return redirect()->route('wallet.recharge');
+        }
+
+        $session = null;
+        DB::transaction(function () use ($user, $pricingMode, $pricePerMessage, $sessionPrice, $commissionSnapshot, &$session) {
+            $session = AiChatSession::create([
+                'user_id' => $user->id,
+                'pricing_mode' => $pricingMode,
+                'price_per_message' => $pricingMode === 'per_message' ? $pricePerMessage : null,
+                'session_price' => $pricingMode === 'per_session' ? $sessionPrice : null,
+                'status' => 'active',
+                'started_at' => now(),
+                'commission_percent_snapshot' => $commissionSnapshot,
+            ]);
+
+            if ($pricingMode === 'per_session' && $sessionPrice > 0) {
+                $txn = $this->wallet->debit(
+                    $user,
+                    $sessionPrice,
+                    'ai_session_charge',
+                    $session->id,
+                    'AI Chat Session Charge',
+                    ['session_id' => $session->id]
+                );
+
+                $session->update([
+                    'total_charged' => $sessionPrice,
+                    'commission_amount_total' => ($sessionPrice * $commissionSnapshot) / 100,
+                ]);
+
+                if ($txn) {
+                    // noop, transaction stored by WalletService
+                }
+            }
+        });
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'session_id' => $session->id,
+                'pricing_mode' => $session->pricing_mode,
+                'price_per_message' => $session->price_per_message,
+                'session_price' => $session->session_price,
+            ]);
+        }
+
+        return redirect()->route('user.ai_chat.show', $session->id);
+    }
+
+    public function sendMessage(Request $request, ?AiChatSession $session = null)
+    {
+        $session = $session ?: AiChatSession::findOrFail($request->input('session_id'));
+        $this->authorizeAccess($session);
+        $blockResponse = $this->guardAiChat($request);
+        if ($blockResponse) {
+            return $blockResponse;
+        }
+
+        if ($session->status !== 'active') {
+            return response()->json(['error' => 'Session is not active'], 409);
+        }
 
         $validated = $request->validate([
             'message' => 'required|string|max:1000',
@@ -197,5 +298,61 @@ class AiChatController extends Controller
         if ($session->user_id !== auth()->id()) {
             abort(403);
         }
+    }
+
+    public function getHistory(Request $request)
+    {
+        $user = $request->user();
+
+        if ($request->filled('session_id')) {
+            $session = AiChatSession::where('user_id', $user->id)
+                ->where('id', $request->input('session_id'))
+                ->firstOrFail();
+
+            $messages = $session->messages()
+                ->orderBy('created_at')
+                ->get()
+                ->map(fn($msg) => [
+                    'id' => $msg->id,
+                    'role' => $msg->role,
+                    'content' => $msg->content,
+                    'created_at' => $msg->created_at->toIso8601String(),
+                ]);
+
+            return response()->json([
+                'session' => [
+                    'id' => $session->id,
+                    'status' => $session->status,
+                    'pricing_mode' => $session->pricing_mode,
+                ],
+                'messages' => $messages,
+            ]);
+        }
+
+        $sessions = AiChatSession::where('user_id', $user->id)
+            ->latest()
+            ->paginate(20);
+
+        return response()->json($sessions);
+    }
+
+    protected function guardAiChat(Request $request)
+    {
+        $enabled = (bool) PricingSetting::get('ai_chat_enabled', true);
+        if (!$enabled) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => 'AI chat is currently disabled'], 503);
+            }
+            return back()->with('error', 'AI chat is currently disabled.');
+        }
+
+        if (UserSecurityFlag::hasActiveFlag(auth()->id(), 'ai_chat_blocked')) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => 'AI chat access restricted'], 403);
+            }
+            return back()->with('error', 'AI chat access restricted.');
+        }
+
+        return null;
     }
 }

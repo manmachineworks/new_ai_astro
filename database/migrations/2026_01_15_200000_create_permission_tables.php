@@ -118,6 +118,17 @@ return new class extends Migration
 
     private function indexExists(string $table, string $index): bool
     {
+        $driver = Schema::getConnection()->getDriverName();
+        if ($driver === 'sqlite') {
+            $indexes = Schema::getConnection()->select("PRAGMA index_list('{$table}')");
+            foreach ($indexes as $idx) {
+                if (($idx->name ?? null) === $index) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         $results = DB::select(
             'SELECT COUNT(1) AS count FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?',
             [$table, $index]

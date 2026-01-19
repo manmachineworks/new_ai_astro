@@ -82,6 +82,41 @@
                     @endif
                 </div>
             </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Reports & Flags</h5>
+                    <span class="badge bg-light text-dark border">{{ $chat->reports->count() }} Reports</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Reported By</th>
+                                    <th>Reason</th>
+                                    <th>Details</th>
+                                    <th>When</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($chat->reports as $report)
+                                    <tr>
+                                        <td>{{ $report->reporter?->name ?? 'User' }}</td>
+                                        <td><span class="badge bg-warning-subtle text-warning">{{ $report->reason }}</span></td>
+                                        <td class="small text-muted">{{ $report->details ?? '-' }}</td>
+                                        <td class="small text-muted">{{ $report->created_at->format('M d, H:i') }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">No reports submitted.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Billing Sidebar -->

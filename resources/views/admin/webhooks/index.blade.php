@@ -77,10 +77,11 @@
                             <i class="fas fa-eye text-primary"></i>
                         </a>
                         @if($event->processing_status === 'failed' || $event->processing_status === 'pending')
-                            <form action="{{ route('admin.system.webhooks.retry', $event->id) }}" method="POST" class="d-inline">
+                            <form action="{{ route('admin.system.webhooks.retry', $event->id) }}" method="POST" class="d-inline"
+                                data-confirm data-confirm-title="Retry Webhook"
+                                data-confirm-text="Retry this webhook event?">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-light rounded-end" title="Retry"
-                                    onclick="return confirm('Retry this webhook event?');">
+                                <button type="submit" class="btn btn-sm btn-light rounded-end" title="Retry">
                                     <i class="fas fa-redo text-warning"></i>
                                 </button>
                             </form>

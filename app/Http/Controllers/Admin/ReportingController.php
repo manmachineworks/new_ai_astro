@@ -8,6 +8,7 @@ use App\Models\CallSession;
 use App\Models\ChatSession;
 use App\Models\AiChatSession;
 use App\Models\PaymentOrder;
+use App\Models\Appointment;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -91,6 +92,10 @@ class ReportingController extends Controller
             );
         });
 
+        if ($request->wantsJson()) {
+            return response()->json(array_merge($data, ['range' => $range]));
+        }
+
         return view('admin.reports.dashboard', array_merge($data, ['range' => $range]));
     }
 
@@ -120,6 +125,14 @@ class ReportingController extends Controller
 
         $metrics = $metricsQuery->paginate(20)->withQueryString();
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'range' => $range,
+                'totals' => $totals,
+                'metrics' => $metrics,
+            ]);
+        }
+
         return view('admin.reports.revenue', compact('range', 'metrics', 'totals'));
     }
 
@@ -137,6 +150,14 @@ class ReportingController extends Controller
 
         $itemsQuery = $this->buildRevenueItemsQuery($type, $range);
         $items = $itemsQuery->orderByDesc('occurred_at')->paginate(25)->withQueryString();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'range' => $range,
+                'type' => $type,
+                'items' => $items,
+            ]);
+        }
 
         return view('admin.reports.revenue_items', compact('range', 'items', 'type'));
     }
@@ -190,6 +211,12 @@ class ReportingController extends Controller
         }
 
         $refunds = $query->paginate(20)->withQueryString();
+        if ($request->wantsJson()) {
+            return response()->json([
+                'range' => $range,
+                'refunds' => $refunds,
+            ]);
+        }
         return view('admin.reports.refunds', compact('refunds', 'range'));
     }
 
@@ -219,6 +246,12 @@ class ReportingController extends Controller
         }
 
         $orders = $query->paginate(20)->withQueryString();
+        if ($request->wantsJson()) {
+            return response()->json([
+                'range' => $range,
+                'orders' => $orders,
+            ]);
+        }
         return view('admin.reports.recharges', compact('orders', 'range'));
     }
 
@@ -244,6 +277,12 @@ class ReportingController extends Controller
         }
 
         $sessions = $query->paginate(20)->withQueryString();
+        if ($request->wantsJson()) {
+            return response()->json([
+                'range' => $range,
+                'sessions' => $sessions,
+            ]);
+        }
         return view('admin.reports.calls', compact('sessions', 'range'));
     }
 
@@ -268,6 +307,12 @@ class ReportingController extends Controller
         }
 
         $sessions = $query->paginate(20)->withQueryString();
+        if ($request->wantsJson()) {
+            return response()->json([
+                'range' => $range,
+                'sessions' => $sessions,
+            ]);
+        }
         return view('admin.reports.chats', compact('sessions', 'range'));
     }
 
@@ -291,6 +336,12 @@ class ReportingController extends Controller
         }
 
         $sessions = $query->paginate(20)->withQueryString();
+        if ($request->wantsJson()) {
+            return response()->json([
+                'range' => $range,
+                'sessions' => $sessions,
+            ]);
+        }
         return view('admin.reports.ai_chats', compact('sessions', 'range'));
     }
 
@@ -300,13 +351,61 @@ class ReportingController extends Controller
         $direction = $request->get('direction', 'desc');
 
         $profiles = \App\Models\AstrologerProfile::with('user')
-            ->withCount(['callSessions as calls_count', 'chatSessions as chats_count'])
+            ->withCount([
+                'callSessions as calls_count',
+                'chatSessions as chats_count',
+                'callSessions as calls_completed' => function ($q) {
+                    $q->where('status', 'completed');
+                },
+                'callSessions as calls_missed' => function ($q) {
+                    $q->whereIn('status', ['missed', 'failed', 'rejected', 'no_answer']);
+                },
+            ])
             ->withSum('callSessions as calls_revenue', 'gross_amount')
             ->withSum('chatSessions as chats_revenue', 'total_charged')
+            ->withSum('callSessions as call_minutes', 'billable_minutes')
             ->orderBy($sort, $direction)
             ->paginate(20);
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'profiles' => $profiles,
+            ]);
+        }
+
         return view('admin.reports.astrologers', compact('profiles'));
+    }
+
+    public function appointments(Request $request)
+    {
+        $range = $this->getRange($request);
+
+        $query = Appointment::with(['user', 'astrologerProfile.user'])
+            ->whereBetween('start_at_utc', [$range['start_utc'], $range['end_utc']])
+            ->latest('start_at_utc');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('export')) {
+            $cols = [
+                'id' => 'Appointment ID',
+                'user.name' => 'User',
+                'astrologerProfile.user.name' => 'Astrologer',
+                'price_total' => 'Amount',
+                'status' => 'Status',
+                'start_at_utc' => 'Start Time (UTC)',
+            ];
+            return app(\App\Services\CsvExportService::class)->streamExport('appointments.csv', $query, $cols);
+        }
+
+        $appointments = $query->paginate(20)->withQueryString();
+
+        return response()->json([
+            'range' => $range,
+            'appointments' => $appointments,
+        ]);
     }
 
     protected function getRange(Request $request): array
@@ -534,4 +633,3 @@ class ReportingController extends Controller
             ->count('user_id');
     }
 }
-

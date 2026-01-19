@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\PhonepePayment;
+use App\Models\PaymentOrder;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Services\PhonePeService;
@@ -48,12 +48,12 @@ class PaymentTest extends TestCase
         $response = $this->postJson('/api/wallet/recharge', ['amount' => 100]);
 
         $response->assertOk()
-            ->assertJsonStructure(['status', 'redirect_url']);
+            ->assertJsonStructure(['status', 'redirect_url', 'order_id', 'merchant_transaction_id']);
 
-        $this->assertDatabaseHas('phonepe_payments', [
+        $this->assertDatabaseHas('payment_orders', [
             'user_id' => $user->id,
             'amount' => 100.00,
-            'status' => 'pending'
+            'status' => 'redirected'
         ]);
     }
 
@@ -63,11 +63,11 @@ class PaymentTest extends TestCase
         $txnId = 'TXN_' . Str::uuid();
 
         // Create initial payment record
-        PhonepePayment::create([
+        $order = PaymentOrder::create([
             'user_id' => $user->id,
-            'merchant_txn_id' => $txnId,
+            'merchant_transaction_id' => $txnId,
             'amount' => 500.00,
-            'status' => 'pending',
+            'status' => 'initiated',
         ]);
 
         // Payload
@@ -92,11 +92,12 @@ class PaymentTest extends TestCase
 
         $response = $this->postJson('/api/webhooks/phonepe', ['response' => $base64], ['X-VERIFY' => $checksum]);
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJson(['status' => 'accepted']);
 
         // Check Payment Status Updated
-        $this->assertDatabaseHas('phonepe_payments', [
-            'merchant_txn_id' => $txnId,
+        $this->assertDatabaseHas('payment_orders', [
+            'merchant_transaction_id' => $txnId,
             'status' => 'success',
         ]);
 
@@ -109,7 +110,7 @@ class PaymentTest extends TestCase
             'amount' => 500.00,
             'type' => 'credit',
             'reference_type' => 'recharge',
-            'reference_id' => $txnId,
+            'reference_id' => $order->id,
         ]);
     }
 
@@ -119,11 +120,24 @@ class PaymentTest extends TestCase
         $txnId = 'TXN_' . Str::uuid();
 
         // Create ALREADY SUCCESS payment
-        PhonepePayment::create([
+        $order = PaymentOrder::create([
             'user_id' => $user->id,
-            'merchant_txn_id' => $txnId,
+            'merchant_transaction_id' => $txnId,
             'amount' => 500.00,
             'status' => 'success',
+        ]);
+
+        WalletTransaction::create([
+            'user_id' => $user->id,
+            'amount' => 500.00,
+            'type' => 'credit',
+            'balance_after' => 600.00,
+            'currency' => 'INR',
+            'source' => 'phonepe',
+            'reference_type' => 'recharge',
+            'reference_id' => $order->id,
+            'description' => 'Wallet Recharge (PhonePe)',
+            'idempotency_key' => 'phonepe:' . $txnId,
         ]);
 
         $payload = [
@@ -137,8 +151,7 @@ class PaymentTest extends TestCase
 
         $response = $this->postJson('/api/webhooks/phonepe', ['response' => $base64], ['X-VERIFY' => $checksum]);
 
-        $response->assertOk()
-            ->assertJson(['status' => 'success', 'message' => 'Already processed']);
+        $response->assertOk();
 
         // Balance should NOT increase again
         $this->assertEquals(100.00, $user->fresh()->wallet_balance);

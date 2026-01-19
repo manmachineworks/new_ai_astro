@@ -42,11 +42,21 @@
                                 <div class="form-text mt-2">
                                     <ul class="mb-0 ps-3 small text-muted">
                                         <li><strong>Super Admin:</strong> Full access to everything.</li>
+                                        <li><strong>Admin:</strong> Broad access across modules.</li>
                                         <li><strong>Finance Admin:</strong> Payments, Wallets, Commissions.</li>
                                         <li><strong>Support Admin:</strong> User management, Refunds, Disputes.</li>
                                         <li><strong>Ops Admin:</strong> Astrologer verification, Content.</li>
+                                        <li><strong>Moderator:</strong> Chats and reviews moderation.</li>
                                     </ul>
                                 </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold small text-uppercase text-muted">Status</label>
+                                <select name="is_active" class="form-select" required>
+                                    <option value="1" selected>Active</option>
+                                    <option value="0">Disabled</option>
+                                </select>
                             </div>
 
                             <div class="d-flex justify-content-end">

@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\UserSecurityFlag;
+use App\Models\AiChatSession;
+use App\Models\Appointment;
 use App\Services\AdminActivityLogger;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 
@@ -104,7 +108,26 @@ class AdminUserController extends Controller
             ? \App\Models\ChatSession::where('user_id', $user->id)->latest()->limit(10)->get()
             : collect([]);
 
-        return view('admin.users.show', compact('user', 'walletTransactions', 'callSessions', 'chatSessions'));
+        $aiSessions = AiChatSession::where('user_id', $user->id)->latest()->limit(10)->get();
+        $appointments = Appointment::where('user_id', $user->id)->latest()->limit(10)->get();
+
+        $aiRestriction = UserSecurityFlag::where('user_id', $user->id)
+            ->where('flag_type', 'ai_chat_blocked')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->latest()
+            ->first();
+
+        return view('admin.users.show', compact(
+            'user',
+            'walletTransactions',
+            'callSessions',
+            'chatSessions',
+            'aiSessions',
+            'appointments',
+            'aiRestriction'
+        ));
     }
 
     public function edit(User $user)
@@ -153,6 +176,113 @@ class AdminUserController extends Controller
         AdminActivityLogger::log('user.toggled', $user, ['is_active' => $user->is_active]);
 
         return redirect()->route('admin.users.index')->with('status', 'User status updated.');
+    }
+
+    public function block(Request $request, User $user)
+    {
+        $this->authorize('block', $user);
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500',
+            'duration_minutes' => 'nullable|integer|min:1',
+            'blocked_until' => 'nullable|date',
+        ]);
+
+        if (empty($validated['duration_minutes']) && empty($validated['blocked_until'])) {
+            return back()->with('error', 'Provide duration or blocked_until.');
+        }
+
+        $blockedUntil = $validated['blocked_until']
+            ? Carbon::parse($validated['blocked_until'])
+            : now()->addMinutes((int) $validated['duration_minutes']);
+
+        $before = $user->only(['blocked_until', 'blocked_reason', 'is_active']);
+
+        $user->update([
+            'is_active' => false,
+            'blocked_at' => now(),
+            'blocked_until' => $blockedUntil,
+            'blocked_reason' => $validated['reason'],
+            'blocked_by_admin_id' => auth()->id(),
+            'unblocked_at' => null,
+        ]);
+
+        AdminActivityLogger::log('user.blocked', $user, [
+            'reason' => $validated['reason'],
+            'blocked_until' => $blockedUntil?->toIso8601String(),
+            'before' => $before,
+        ]);
+
+        return back()->with('success', 'User blocked.');
+    }
+
+    public function unblock(Request $request, User $user)
+    {
+        $this->authorize('block', $user);
+
+        $before = $user->only(['blocked_until', 'blocked_reason', 'is_active']);
+
+        $user->update([
+            'is_active' => true,
+            'blocked_until' => null,
+            'blocked_reason' => null,
+            'blocked_by_admin_id' => null,
+            'unblocked_at' => now(),
+        ]);
+
+        AdminActivityLogger::log('user.unblocked', $user, [
+            'before' => $before,
+        ]);
+
+        return back()->with('success', 'User unblocked.');
+    }
+
+    public function restrictAiChat(Request $request, User $user)
+    {
+        $this->authorize('block', $user);
+
+        $validated = $request->validate([
+            'reason' => 'nullable|string|max:500',
+            'duration_minutes' => 'nullable|integer|min:1',
+        ]);
+
+        $expiresAt = null;
+        if (!empty($validated['duration_minutes'])) {
+            $expiresAt = now()->addMinutes((int) $validated['duration_minutes']);
+        }
+
+        UserSecurityFlag::create([
+            'user_id' => $user->id,
+            'flag_type' => 'ai_chat_blocked',
+            'expires_at' => $expiresAt,
+            'meta_json' => [
+                'reason' => $validated['reason'] ?? null,
+                'admin_id' => auth()->id(),
+            ],
+        ]);
+
+        AdminActivityLogger::log('user.ai_chat_blocked', $user, [
+            'reason' => $validated['reason'] ?? null,
+            'expires_at' => $expiresAt?->toIso8601String(),
+        ]);
+
+        return back()->with('success', 'AI chat restricted for user.');
+    }
+
+    public function liftAiChatRestriction(Request $request, User $user)
+    {
+        $this->authorize('block', $user);
+
+        UserSecurityFlag::where('user_id', $user->id)
+            ->where('flag_type', 'ai_chat_blocked')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->update(['expires_at' => now()]);
+
+        AdminActivityLogger::log('user.ai_chat_unblocked', $user);
+
+        return back()->with('success', 'AI chat restriction lifted.');
     }
     public function bulkAction(Request $request)
     {

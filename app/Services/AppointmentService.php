@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Models\Appointment;
 use App\Models\AppointmentSlot;
 use App\Models\AstrologerProfile;
+use App\Models\AstrologerEarningsLedger;
 use App\Models\MeetingLink;
 use App\Models\NotificationJob;
+use App\Models\PricingSetting;
 use App\Models\User;
 use App\Models\WalletHold;
 use Illuminate\Support\Facades\DB;
@@ -242,6 +244,22 @@ class AppointmentService
 
             if ($slot) {
                 $slot->book($appointment);
+            }
+
+            $commissionPercent = (float) PricingSetting::get('platform_commission_percent', 20);
+            $grossAmount = (float) $appointment->price_total;
+            $commissionAmount = ($grossAmount * $commissionPercent) / 100;
+            $earningsAmount = $grossAmount - $commissionAmount;
+
+            if ($earningsAmount > 0) {
+                AstrologerEarningsLedger::create([
+                    'astrologer_profile_id' => $appointment->astrologer_profile_id,
+                    'source' => 'appointment',
+                    'reference_type' => Appointment::class,
+                    'reference_id' => $appointment->id,
+                    'amount' => $earningsAmount,
+                    'status' => 'available',
+                ]);
             }
 
             $this->ensureMeetingLink($appointment);

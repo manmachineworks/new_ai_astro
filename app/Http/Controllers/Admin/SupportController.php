@@ -29,7 +29,22 @@ class SupportController extends Controller
 
         $tickets = $query->latest()->paginate(50);
 
-        return view('admin.support.index', compact('tickets'));
+        $resolvedTickets = SupportTicket::whereIn('status', ['resolved', 'closed'])
+            ->get(['created_at', 'updated_at']);
+        $avgHours = $resolvedTickets->count() > 0
+            ? round($resolvedTickets->avg(function ($ticket) {
+                return $ticket->updated_at->diffInMinutes($ticket->created_at) / 60;
+            }))
+            : 0;
+
+        $stats = [
+            'open' => SupportTicket::where('status', 'open')->count(),
+            'pending' => SupportTicket::where('status', 'pending')->count(),
+            'resolved_today' => SupportTicket::where('status', 'resolved')->whereDate('updated_at', now()->toDateString())->count(),
+            'avg_response_hours' => (int) $avgHours,
+        ];
+
+        return view('admin.support.index', compact('tickets', 'stats'));
     }
 
     /**

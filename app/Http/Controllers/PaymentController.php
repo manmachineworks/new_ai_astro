@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentOrder;
 use App\Models\User;
+use App\Models\WebhookEvent;
+use App\Jobs\ProcessPhonePeWebhook;
 use App\Services\PhonePeService;
+use App\Services\WebhookPayloadMasker;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -63,6 +66,48 @@ class PaymentController extends Controller
         return back()->with('error', 'Failed to initiate payment. Please try again.');
     }
 
+    public function initiate(Request $request)
+    {
+        $request->validate([
+            'amount' => 'required|numeric|min:1',
+        ]);
+
+        $user = $request->user();
+        $amount = $request->amount;
+        $merchantTxnId = 'TXN_' . Str::upper(Str::random(12));
+
+        $order = PaymentOrder::create([
+            'user_id' => $user->id,
+            'amount' => $amount,
+            'merchant_transaction_id' => $merchantTxnId,
+            'status' => 'initiated',
+            'provider' => 'phonepe',
+            'currency' => 'INR',
+        ]);
+
+        $response = $this->phonePe->initiatePayment($merchantTxnId, $amount, (string) $user->id, $user->phone);
+
+        if ($response && isset($response['data']['instrumentResponse']['redirectInfo']['url'])) {
+            $payUrl = $response['data']['instrumentResponse']['redirectInfo']['url'];
+
+            $order->update([
+                'status' => 'redirected',
+                'payment_url' => $payUrl,
+                'meta' => ['init_response' => $response],
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'redirect_url' => $payUrl,
+                'order_id' => $order->id,
+                'merchant_transaction_id' => $merchantTxnId,
+            ]);
+        }
+
+        $order->update(['status' => 'failed', 'meta' => ['failed_response' => $response]]);
+        return response()->json(['status' => 'failed', 'message' => 'Failed to initiate payment.'], 502);
+    }
+
     // 3. Handle Webhook (Server-to-Server)
     public function handleWebhook(Request $request)
     {
@@ -73,68 +118,47 @@ class PaymentController extends Controller
             return response()->json(['error' => 'Invalid Request'], 400);
         }
 
-        // Verify Signature
-        if (!$this->phonePe->verifyCallback($payload, $xVerify)) {
-            Log::error('PhonePe Webhook Signature Mismatch');
+        $isValid = $this->phonePe->verifyCallback($payload, $xVerify);
+        $decoded = json_decode(base64_decode($payload), true);
+        $txnId = $decoded['data']['merchantTransactionId'] ?? null;
+
+        $headers = WebhookPayloadMasker::mask($request->headers->all());
+        $eventPayload = WebhookPayloadMasker::mask([
+            'raw' => $payload,
+            'decoded' => $decoded,
+        ]);
+
+        $alreadyProcessed = false;
+        if ($txnId) {
+            $alreadyProcessed = WebhookEvent::query()
+                ->where('provider', 'phonepe')
+                ->where('external_id', $txnId)
+                ->where('processing_status', 'processed')
+                ->exists();
+        }
+
+        $event = WebhookEvent::create([
+            'provider' => 'phonepe',
+            'event_type' => $decoded['code'] ?? 'PAYMENT_UPDATE',
+            'external_id' => $txnId,
+            'signature_valid' => $isValid,
+            'payload' => $eventPayload,
+            'headers' => $headers,
+            'processing_status' => $isValid && !$alreadyProcessed ? 'pending' : ($alreadyProcessed ? 'duplicate' : 'failed'),
+            'error_message' => $isValid ? null : 'Invalid signature',
+        ]);
+
+        if (!$isValid) {
             return response()->json(['error' => 'Signature Mismatch'], 400);
         }
 
-        $data = json_decode(base64_decode($payload), true);
-
-        if (!$data || !isset($data['data']['merchantTransactionId'])) {
-            return response()->json(['error' => 'Invalid Payload'], 400);
+        if ($alreadyProcessed) {
+            return response()->json(['status' => 'duplicate', 'event_id' => $event->id]);
         }
 
-        $txnId = $data['data']['merchantTransactionId'];
-        $providerRefId = $data['data']['transactionId'] ?? null;
-        $status = $data['code'] ?? 'FAILED';
+        ProcessPhonePeWebhook::dispatch($event->id);
 
-        $order = PaymentOrder::where('merchant_transaction_id', $txnId)->first();
-
-        if (!$order) {
-            Log::error('Payment Order Not Found: ' . $txnId);
-            return response()->json(['status' => 'Order Not Found'], 404);
-        }
-
-        if ($order->status === 'completed') {
-            return response()->json(['status' => 'Already Processed']);
-        }
-
-        // Handle Success
-        if ($status === 'PAYMENT_SUCCESS') {
-            // Transactional Update
-            try {
-                \DB::beginTransaction();
-
-                $order->update([
-                    'status' => 'completed',
-                    'provider_transaction_id' => $providerRefId,
-                    'meta' => $data
-                ]);
-
-                // Credit Wallet
-                $this->wallet->credit(
-                    $order->user,
-                    $order->amount,
-                    'recharge',
-                    $order->id,
-                    "Wallet Recharge (Txn: $txnId)",
-                    ['provider_ref' => $providerRefId],
-                    $txnId // Idempotency
-                );
-
-                \DB::commit();
-                return response()->json(['status' => 'Success']);
-            } catch (\Exception $e) {
-                \DB::rollBack();
-                Log::error('Wallet Credit Failed: ' . $e->getMessage());
-                return response()->json(['error' => 'Internal Error'], 500);
-            }
-        } else {
-            // Failed
-            $order->update(['status' => 'failed', 'meta' => $data]);
-            return response()->json(['status' => 'Marked Failed']);
-        }
+        return response()->json(['status' => 'accepted', 'event_id' => $event->id]);
     }
 
     // 4. Handle Redirect (User Return)

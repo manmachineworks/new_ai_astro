@@ -28,7 +28,7 @@ return new class extends Migration {
             $table->string('default_locale')->default('en');
 
             $table->json('variables_schema')->nullable(); // ["balance", "currency"]
-            $table->json('channels_enabled')->default(json_encode(['push', 'inbox']));
+            $table->json('channels_enabled')->nullable(); // Default handled in app for MySQL < 8.0.13
 
             $table->timestamps();
         });

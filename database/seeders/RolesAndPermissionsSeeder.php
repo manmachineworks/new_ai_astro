@@ -30,6 +30,8 @@ class RolesAndPermissionsSeeder extends Seeder
         $roleAdmin = Role::firstOrCreate(['name' => 'Admin']);
         $roleAdmin->givePermissionTo(Permission::all());
 
+        Role::firstOrCreate(['name' => 'Moderator']);
+
         $roleAstrologer = Role::firstOrCreate(['name' => 'Astrologer']);
         // Assign specific permissions to Astrologer if needed
         // $roleAstrologer->givePermissionTo('view some dashboard');

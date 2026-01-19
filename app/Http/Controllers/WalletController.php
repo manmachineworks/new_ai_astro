@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\PaymentOrder;
 use App\Models\WebhookEvent;
 use App\Services\PhonePeClient;
+use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class WalletController extends Controller
@@ -21,6 +21,22 @@ class WalletController extends Controller
     public function showRecharge()
     {
         return view('wallet.recharge');
+    }
+
+    public function balance(Request $request)
+    {
+        return response()->json([
+            'balance' => $request->user()->wallet_balance,
+        ]);
+    }
+
+    public function transactions(Request $request)
+    {
+        $transactions = WalletTransaction::where('user_id', $request->user()->id)
+            ->latest()
+            ->paginate(20);
+
+        return response()->json($transactions);
     }
 
     // Process Recharge Request

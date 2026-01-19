@@ -1,0 +1,45 @@
+/* Public Site Custom Styles */
+:root {
+    --primary-color: #6366f1;
+    --secondary-color: #64748b;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #f8fafc;
+}
+
+/* Chat Bubbles (Shared styled) */
+.chat-bubble {
+    padding: 10px 15px;
+    border-radius: 15px;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+/* Hero Section */
+.hero-section {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: white;
+    padding: 4rem 0;
+}
+
+/* Astrologer Card */
+.astrologer-card {
+    transition: transform 0.2s;
+}
+
+.astrologer-card:hover {
+    transform: translateY(-5px);
+}
+
+.verified-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: #10b981;
+    color: white;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+}

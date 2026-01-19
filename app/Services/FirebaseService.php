@@ -15,17 +15,21 @@ class FirebaseService
 
     public function __construct()
     {
-        $factory = (new Factory)
-            ->withServiceAccount([
-                'project_id' => config('firebase.project_id'),
-                'client_email' => config('firebase.client_email'),
-                'private_key' => config('firebase.private_key'),
-            ])
-            ->withDefaultStorageBucket(config('firebase.storage_bucket'));
+        try {
+            $factory = (new Factory)
+                ->withServiceAccount([
+                    'project_id' => config('firebase.project_id') ?? 'mock',
+                    'client_email' => config('firebase.client_email') ?? 'mock@example.com',
+                    'private_key' => config('firebase.private_key') ?? 'mock-key',
+                ])
+                ->withDefaultStorageBucket(config('firebase.storage_bucket'));
 
-        $this->auth = $factory->createAuth();
-        $this->messaging = $factory->createMessaging();
-        $this->storage = $factory->createStorage();
+            $this->auth = $factory->createAuth();
+            $this->messaging = $factory->createMessaging();
+            $this->storage = $factory->createStorage();
+        } catch (\Throwable $e) {
+            Log::warning('FirebaseService: Failed to initialize. Check credentials.', ['error' => $e->getMessage()]);
+        }
     }
 
     /**

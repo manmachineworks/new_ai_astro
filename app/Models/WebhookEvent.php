@@ -2,31 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class WebhookEvent extends Model
 {
-    use HasUuids;
+    use HasFactory;
 
     protected $fillable = [
         'provider',
-        'event_type',
-        'external_id',
-        'signature_valid',
+        'event_id',
         'payload',
-        'headers',
         'processed_at',
-        'processing_status',
-        'error_message',
-        'attempts'
     ];
 
     protected $casts = [
-        'payload' => 'json',
-        'headers' => 'json',
-        'signature_valid' => 'boolean',
+        'payload' => 'array',
         'processed_at' => 'datetime',
-        'attempts' => 'integer',
     ];
 }

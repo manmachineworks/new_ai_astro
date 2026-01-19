@@ -16,7 +16,8 @@ class UserResource extends JsonResource
     {
         $user = $request->user();
         $isOwner = $user && $user->id === $this->id;
-        $isAdmin = $user && $user->hasRole('Admin');
+        $isAdmin = $user && $user->hasAnyRole(['Super Admin', 'Admin', 'Finance Admin', 'Support Admin', 'Ops Admin']);
+        $isAstrologer = $user && $user->hasRole('Astrologer');
 
         $data = [
             'id' => $this->id,
@@ -28,6 +29,9 @@ class UserResource extends JsonResource
         if ($isOwner || $isAdmin) {
             $data['phone'] = $this->phone;
             $data['email'] = $this->email;
+        } elseif ($isAstrologer) {
+            $data['phone'] = null;
+            $data['email'] = null;
         } else {
             // Masked versions if needed for UI, or omit entirely
             $data['phone'] = $this->mask($this->phone, 2, 2);

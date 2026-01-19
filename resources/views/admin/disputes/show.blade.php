@@ -149,7 +149,7 @@
                     </div>
                     <div class="card-body">
                         <!-- Request More Info -->
-                        <form method="POST" action="{{ route('admin.disputes.request-info', $dispute) }}" class="mb-3">
+                        <form method="POST" action="{{ route('admin.disputes.request_info', $dispute) }}" class="mb-3">
                             @csrf
                             <label class="form-label small">Request More Info</label>
                             <textarea name="message" class="form-control form-control-sm mb-2" rows="2"

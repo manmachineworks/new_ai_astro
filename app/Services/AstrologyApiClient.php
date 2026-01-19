@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\PricingSetting;
 
 class AstrologyApiClient
 {
@@ -14,10 +15,10 @@ class AstrologyApiClient
 
     public function __construct()
     {
-        $this->baseUrl = config('astrologyapi.base_url');
-        $this->userId = config('astrologyapi.user_id');
-        $this->apiKey = config('astrologyapi.api_key');
-        $this->timeout = config('astrologyapi.timeout');
+        $this->baseUrl = PricingSetting::get('astrology_api_base_url', config('astrologyapi.base_url'));
+        $this->userId = PricingSetting::get('astrology_api_user_id', config('astrologyapi.user_id'));
+        $this->apiKey = PricingSetting::get('astrology_api_key', config('astrologyapi.api_key'));
+        $this->timeout = (int) PricingSetting::get('astrology_api_timeout', config('astrologyapi.timeout'));
     }
 
     /**

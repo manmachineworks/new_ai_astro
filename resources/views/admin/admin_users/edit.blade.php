@@ -43,6 +43,14 @@
                                 </select>
                             </div>
 
+                            <div class="mb-4">
+                                <label class="form-label fw-bold small text-uppercase text-muted">Status</label>
+                                <select name="is_active" class="form-select" required>
+                                    <option value="1" @selected($admin->is_active)>Active</option>
+                                    <option value="0" @selected(!$admin->is_active)>Disabled</option>
+                                </select>
+                            </div>
+
                             <div class="d-flex justify-content-end">
                                 <a href="{{ route('admin.admin-users.index') }}"
                                     class="btn btn-light rounded-pill px-4 me-2">Cancel</a>

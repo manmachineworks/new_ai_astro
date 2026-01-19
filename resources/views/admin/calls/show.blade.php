@@ -86,6 +86,16 @@
                         </div>
                     </div>
 
+                    @php $recordingUrl = data_get($call->meta_json, 'recording_url'); @endphp
+                    @if(!empty($recordingUrl))
+                        <div class="mt-3">
+                            <div class="alert alert-secondary small mb-0">
+                                <i class="fas fa-music me-2"></i> Recording:
+                                <a href="{{ $recordingUrl }}" target="_blank">Open recording</a>
+                            </div>
+                        </div>
+                    @endif
+
                     @if($call->meta_json)
                         <hr>
                         <h6 class="text-muted text-uppercase mb-2 small">Metadata</h6>

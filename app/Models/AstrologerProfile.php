@@ -34,6 +34,7 @@ class AstrologerProfile extends Model
         'is_call_enabled',
         'is_sms_enabled',
         'is_chat_enabled',
+        'is_appointment_enabled',
         'rating_avg',
         'rating_count',
         'profile_fields',
@@ -57,6 +58,7 @@ class AstrologerProfile extends Model
         'is_call_enabled' => 'boolean',
         'is_sms_enabled' => 'boolean',
         'is_chat_enabled' => 'boolean',
+        'is_appointment_enabled' => 'boolean',
         'call_per_minute' => 'decimal:2',
         'chat_per_session' => 'decimal:2',
         'rating_avg' => 'decimal:2',
@@ -76,6 +78,11 @@ class AstrologerProfile extends Model
     public function availabilityRules()
     {
         return $this->hasMany(AvailabilityRule::class);
+    }
+
+    public function availabilityExceptions(): HasMany
+    {
+        return $this->hasMany(AvailabilityException::class);
     }
 
     public function reviews(): HasMany
@@ -105,5 +112,10 @@ class AstrologerProfile extends Model
     public function chatSessions(): HasMany
     {
         return $this->hasMany(ChatSession::class);
+    }
+
+    public function pricingHistories(): HasMany
+    {
+        return $this->hasMany(AstrologerPricingHistory::class);
     }
 }

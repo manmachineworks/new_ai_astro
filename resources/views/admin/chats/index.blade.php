@@ -48,7 +48,46 @@
         </div>
     </div>
 
-    <x-admin.filter-bar :action="route('admin.chats.index')" :filters="['date', 'status']" />
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="text-muted small">Filters apply to aggregates and list below.</div>
+        <a href="{{ route('admin.chats.index', array_merge(request()->query(), ['export' => 'csv'])) }}"
+            class="btn btn-outline-secondary btn-sm rounded-pill">
+            <i class="fas fa-file-csv me-1"></i>Export CSV
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ route('admin.chats.index') }}" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Search</label>
+                    <input type="text" name="search" value="{{ request('search') }}" class="form-control"
+                        placeholder="User, phone, astrologer">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All</option>
+                        @foreach(['active','completed','failed','ended'] as $status)
+                            <option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">From</label>
+                    <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">To</label>
+                    <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control">
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    <a href="{{ route('admin.chats.index') }}" class="btn btn-light w-100">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <x-admin.table :columns="['ID', 'Date', 'User', 'Astrologer', 'Duration', 'Messages', 'Cost', 'Status', 'Actions']"
         :rows="$chats">

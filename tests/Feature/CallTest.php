@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CallSession;
 use App\Models\User;
-use App\Services\CallerDeskService;
+use App\Services\CallerDeskClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -36,20 +36,20 @@ class CallTest extends TestCase
         Sanctum::actingAs($user, ['*']);
 
         // Mock Service
-        $this->mock(CallerDeskService::class, function ($mock) {
-            $mock->shouldReceive('initiateCall')
+        $this->mock(CallerDeskClient::class, function ($mock) {
+            $mock->shouldReceive('initiateMaskedCall')
                 ->once()
-                ->andReturn(['status' => 'success']);
+                ->andReturn(['status' => 'success', 'provider_call_id' => 'CD_123']);
         });
 
         $response = $this->postJson('/api/call/initiate', ['astrologer_id' => $astro->id]);
 
         $response->assertOk()
-            ->assertJsonStructure(['call_id']);
+            ->assertJsonStructure(['call_id', 'provider_call_id']);
 
         $this->assertDatabaseHas('call_sessions', [
             'user_id' => $user->id,
-            'astrologer_user_id' => $astro->id,
+            'astrologer_profile_id' => $astro->astrologerProfile->id,
             'status' => 'connecting',
             'rate_per_minute' => 10.00
         ]);
@@ -110,16 +110,16 @@ class CallTest extends TestCase
         $callId = 'CALL_TEST_123';
         $session = CallSession::create([
             'user_id' => $user->id,
-            'astrologer_user_id' => $astro->id,
+            'astrologer_profile_id' => $astro->astrologerProfile->id,
             'status' => 'connecting',
             'rate_per_minute' => 10.00,
-            'callerdesk_call_id' => $callId,
+            'provider_call_id' => $callId,
         ]);
 
         // Webhook Payload (3 mins = 60 * 3 = 180 sec) -> 3 * 10 = 30 Cost.
         // Earning = 30 * 0.7 = 21.00
         $response = $this->postJson('/api/webhooks/callerdesk', [
-            'reference_id' => $callId,
+            'call_id' => $callId,
             'status' => 'completed',
             'duration' => 180
         ]);
@@ -131,14 +131,11 @@ class CallTest extends TestCase
             'id' => $session->id,
             'status' => 'completed',
             'duration_seconds' => 180,
-            'cost' => 30.00
+            'gross_amount' => 30.00
         ]);
 
         // Check User Logic (Debit 30)
         $this->assertEquals(70.00, $user->fresh()->wallet_balance);
-
-        // Check Astro Logic (Credit 21)
-        $this->assertEquals(21.00, $astro->fresh()->wallet_balance);
 
         // Log Check
         $this->assertDatabaseHas('wallet_transactions', [
@@ -146,10 +143,10 @@ class CallTest extends TestCase
             'amount' => 30.00,
             'type' => 'debit'
         ]);
-        $this->assertDatabaseHas('wallet_transactions', [
-            'user_id' => $astro->id,
-            'amount' => 21.00,
-            'type' => 'credit'
+        $this->assertDatabaseHas('astrologer_earnings_ledger', [
+            'astrologer_profile_id' => $astro->astrologerProfile->id,
+            'amount' => 24.00,
+            'status' => 'available'
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -39,8 +40,15 @@ return new class extends Migration {
         });
 
         // Create unique constraint and index with prefix to fit MySQL 1000-byte limit
-        \DB::statement('CREATE UNIQUE INDEX unique_dispute_per_transaction ON disputes (user_id, reference_type(100), reference_id(100))');
-        \DB::statement('CREATE INDEX idx_dispute_ref ON disputes (reference_type(100), reference_id(100))');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('CREATE UNIQUE INDEX unique_dispute_per_transaction ON disputes (user_id, reference_type(100), reference_id(100))');
+            DB::statement('CREATE INDEX idx_dispute_ref ON disputes (reference_type(100), reference_id(100))');
+        } else {
+            Schema::table('disputes', function (Blueprint $table) {
+                $table->unique(['user_id', 'reference_type', 'reference_id'], 'unique_dispute_per_transaction');
+                $table->index(['reference_type', 'reference_id'], 'idx_dispute_ref');
+            });
+        }
     }
 
     public function down(): void

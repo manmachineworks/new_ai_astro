@@ -18,7 +18,7 @@ class PromoController extends Controller
     /**
      * Validate a promo code
      */
-    public function validate(Request $request)
+    public function validatePromo(Request $request)
     {
         $request->validate([
             'code' => 'required|string',

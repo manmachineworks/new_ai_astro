@@ -3,9 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AvailabilityException;
+use App\Models\AvailabilityRule;
+use App\Models\AstrologerEarningsLedger;
+use App\Models\CallSession;
+use App\Models\ChatSession;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class AdminAstrologerController extends Controller
 {
@@ -33,6 +39,11 @@ class AdminAstrologerController extends Controller
                 $q->where('verification_status', $request->status);
             });
         }
+        if ($request->filled('visible')) {
+            $query->whereHas('astrologerProfile', function ($q) use ($request) {
+                $q->where('show_on_front', (bool) $request->visible);
+            });
+        }
 
         // Export
         if ($request->input('export') === 'csv') {
@@ -48,7 +59,48 @@ class AdminAstrologerController extends Controller
     {
         // Accept ID directly to avoid route key binding issues if mixed with User model
         $astrologer = User::with(['astrologerProfile.documents', 'astrologerProfile.availabilityRules', 'astrologerProfile.reviews'])->findOrFail($id);
-        return view('admin.astrologers.show', compact('astrologer'));
+        $profile = $astrologer->astrologerProfile;
+
+        $callStats = CallSession::where('astrologer_profile_id', $profile->id)
+            ->selectRaw("
+                COUNT(*) as total_calls,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_calls,
+                SUM(CASE WHEN status IN ('missed', 'rejected', 'failed') THEN 1 ELSE 0 END) as missed_calls,
+                COALESCE(SUM(billable_minutes), 0) as total_minutes,
+                COALESCE(SUM(gross_amount), 0) as gross_revenue
+            ")
+            ->first();
+
+        $chatStats = ChatSession::where('astrologer_profile_id', $profile->id)
+            ->selectRaw("
+                COUNT(*) as total_chats,
+                COALESCE(SUM(total_messages_user + total_messages_astrologer), 0) as total_messages,
+                COALESCE(SUM(cost), 0) as gross_revenue
+            ")
+            ->first();
+
+        $earningsSummary = AstrologerEarningsLedger::where('astrologer_profile_id', $profile->id)
+            ->selectRaw('COALESCE(SUM(amount), 0) as total_earned')
+            ->first();
+
+        $availabilityExceptions = AvailabilityException::where('astrologer_profile_id', $profile->id)
+            ->orderByDesc('date')
+            ->limit(20)
+            ->get();
+
+        $pricingHistory = Schema::hasTable('astrologer_pricing_histories')
+            ? $profile->pricingHistories()->latest()->limit(20)->get()
+            : collect();
+
+        return view('admin.astrologers.show', compact(
+            'astrologer',
+            'profile',
+            'callStats',
+            'chatStats',
+            'earningsSummary',
+            'availabilityExceptions',
+            'pricingHistory'
+        ));
     }
 
     public function verify(Request $request, $id)
@@ -111,6 +163,139 @@ class AdminAstrologerController extends Controller
         ]);
 
         return back()->with('success', 'Account status toggled.');
+    }
+
+    public function updateProfile(Request $request, $id)
+    {
+        $request->validate([
+            'display_name' => 'nullable|string|max:255',
+            'experience_years' => 'nullable|integer|min:0|max:80',
+            'skills' => 'nullable|string|max:1000',
+            'languages' => 'nullable|string|max:1000',
+            'bio' => 'nullable|string|max:2000',
+        ]);
+
+        $user = User::findOrFail($id);
+        $profile = $user->astrologerProfile;
+
+        $profile->update([
+            'display_name' => $request->input('display_name', $profile->display_name),
+            'experience_years' => $request->input('experience_years', $profile->experience_years),
+            'skills' => $request->filled('skills') ? array_filter(array_map('trim', explode(',', $request->skills))) : $profile->skills,
+            'languages' => $request->filled('languages') ? array_filter(array_map('trim', explode(',', $request->languages))) : $profile->languages,
+            'bio' => $request->input('bio', $profile->bio),
+        ]);
+
+        \App\Services\AdminActivityLogger::log('astrologer.profile_updated', $user);
+
+        return back()->with('success', 'Profile details updated.');
+    }
+
+    public function updateServices(Request $request, $id)
+    {
+        $request->validate([
+            'call_per_minute' => 'nullable|numeric|min:0',
+            'chat_per_session' => 'nullable|numeric|min:0',
+            'is_call_enabled' => 'nullable|boolean',
+            'is_chat_enabled' => 'nullable|boolean',
+            'is_sms_enabled' => 'nullable|boolean',
+            'is_appointment_enabled' => 'nullable|boolean',
+        ]);
+
+        $user = User::findOrFail($id);
+        $profile = $user->astrologerProfile;
+
+        $profile->update([
+            'call_per_minute' => $request->input('call_per_minute', $profile->call_per_minute),
+            'chat_per_session' => $request->input('chat_per_session', $profile->chat_per_session),
+            'is_call_enabled' => $request->boolean('is_call_enabled'),
+            'is_chat_enabled' => $request->boolean('is_chat_enabled'),
+            'is_sms_enabled' => $request->boolean('is_sms_enabled'),
+            'is_appointment_enabled' => $request->boolean('is_appointment_enabled'),
+        ]);
+
+        \App\Services\AdminActivityLogger::log('astrologer.services_updated', $user);
+
+        return back()->with('success', 'Services and pricing updated.');
+    }
+
+    public function storeAvailabilityRule(Request $request, $id)
+    {
+        $request->validate([
+            'day_of_week' => 'required|integer|min:0|max:6',
+            'start_time_utc' => 'required|date_format:H:i',
+            'end_time_utc' => 'required|date_format:H:i|after:start_time_utc',
+        ]);
+
+        $user = User::findOrFail($id);
+        $profile = $user->astrologerProfile;
+
+        AvailabilityRule::create([
+            'astrologer_profile_id' => $profile->id,
+            'day_of_week' => $request->day_of_week,
+            'start_time_utc' => $request->start_time_utc,
+            'end_time_utc' => $request->end_time_utc,
+            'is_active' => true,
+        ]);
+
+        \App\Services\AdminActivityLogger::log('astrologer.availability_rule_created', $user);
+
+        return back()->with('success', 'Availability slot added.');
+    }
+
+    public function deleteAvailabilityRule($id, $ruleId)
+    {
+        $user = User::findOrFail($id);
+        $profile = $user->astrologerProfile;
+
+        AvailabilityRule::where('id', $ruleId)
+            ->where('astrologer_profile_id', $profile->id)
+            ->delete();
+
+        \App\Services\AdminActivityLogger::log('astrologer.availability_rule_deleted', $user, ['rule_id' => $ruleId]);
+
+        return back()->with('success', 'Availability slot removed.');
+    }
+
+    public function storeAvailabilityException(Request $request, $id)
+    {
+        $request->validate([
+            'date' => 'required|date',
+            'type' => 'required|in:blocked,extra',
+            'start_time_utc' => 'nullable|date_format:H:i',
+            'end_time_utc' => 'nullable|date_format:H:i',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        $user = User::findOrFail($id);
+        $profile = $user->astrologerProfile;
+
+        AvailabilityException::create([
+            'astrologer_profile_id' => $profile->id,
+            'date' => $request->date,
+            'type' => $request->type,
+            'start_time_utc' => $request->start_time_utc,
+            'end_time_utc' => $request->end_time_utc,
+            'note' => $request->note,
+        ]);
+
+        \App\Services\AdminActivityLogger::log('astrologer.availability_exception_created', $user);
+
+        return back()->with('success', 'Availability exception added.');
+    }
+
+    public function deleteAvailabilityException($id, $exceptionId)
+    {
+        $user = User::findOrFail($id);
+        $profile = $user->astrologerProfile;
+
+        AvailabilityException::where('id', $exceptionId)
+            ->where('astrologer_profile_id', $profile->id)
+            ->delete();
+
+        \App\Services\AdminActivityLogger::log('astrologer.availability_exception_deleted', $user, ['exception_id' => $exceptionId]);
+
+        return back()->with('success', 'Availability exception removed.');
     }
 
     private function exportCsv($query)

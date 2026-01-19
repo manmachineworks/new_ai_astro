@@ -20,6 +20,10 @@ class PricingSetting extends Model
         $setting = self::where('key', $key)->first();
         // The value is stored in 'value_json', but the accessor or cast handles it.
         // However, if we saved it as json_encode($val), it comes out native type via cast.
-        return $setting ? $setting->value_json : $default;
+        if (!$setting) {
+            return $default;
+        }
+
+        return $setting->value_json !== null ? $setting->value_json : $default;
     }
 }

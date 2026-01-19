@@ -35,6 +35,10 @@ class AdminChatController extends Controller
             $query->whereDate('created_at', '<=', $request->input('date_to'));
         }
 
+        if ($request->input('export') === 'csv') {
+            return $this->exportCsv($query);
+        }
+
         // Stats Aggregation
         $statsQuery = clone $query;
         $totalMessages = 0;
@@ -62,7 +66,7 @@ class AdminChatController extends Controller
 
     public function show($id)
     {
-        $chat = ChatSession::with(['user', 'astrologer'])->findOrFail($id);
+        $chat = ChatSession::with(['user', 'astrologer', 'reports.reporter'])->findOrFail($id);
 
         return view('admin.chats.show', compact('chat'));
     }

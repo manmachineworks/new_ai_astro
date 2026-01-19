@@ -4,7 +4,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name', 'Astro') }}</title>
+
+    <x-seo.meta :title="trim($__env->yieldContent('meta_title', config('app.name', 'Astro')))"
+        :description="trim($__env->yieldContent('meta_description', ''))" />
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#1a1a2e">

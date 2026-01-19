@@ -9,6 +9,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdminAuthenticate
 {
+    private const ADMIN_ROLE_NAMES = [
+        'Super Admin',
+        'Admin',
+        'Finance Admin',
+        'Support Admin',
+        'Ops Admin',
+        'Moderator',
+    ];
+
     /**
      * Handle an incoming request.
      *
@@ -21,7 +30,11 @@ class AdminAuthenticate
             return redirect()->route('admin.login');
         }
 
-        if (!$user->hasAnyRole(['Super Admin', 'Admin'])) {
+        $hasRole = $user->roles()
+            ->whereIn('name', self::ADMIN_ROLE_NAMES)
+            ->exists();
+
+        if (!$hasRole) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

@@ -1,169 +1,219 @@
-@extends('layouts.app')
+@extends('layouts.public')
 
 @section('content')
-    <div class="hero-section text-center py-5">
-        <div class="container py-5">
+
+    <!-- Hero Section -->
+    <section class="hero-section text-center text-white">
+        <div class="container">
             <div class="row justify-content-center">
                 <div class="col-lg-8">
-                    <h1 class="display-3 fw-bold mb-4">
-                        Your Destiny, <span class="text-gold">Decoded</span>
-                    </h1>
-                    <p class="lead text-muted mb-5">
-                        Connect with over 1000+ verified Vedic Astrologers, Tarot Readers, and Numerologists via Chat or
-                        Call.
-                    </p>
-                    <div class="d-flex justify-content-center gap-3">
-                        <a href="{{ route('login') }}" class="btn btn-cosmic btn-lg">Chat with Astrologer</a>
-                        <a href="#" class="btn btn-glass btn-lg">Get Daily Horoscope</a>
+                    <h1 class="display-4 fw-bold mb-4">Discover Your Cosmic Path</h1>
+                    <p class="lead mb-5 opacity-90">Instant access to verified astrologers for life-changing guidance.
+                        Privacy guaranteed.</p>
+                    <div class="d-flex gap-3 justify-content-center">
+                        <a href="{{ route('user.astrologers.index') }}"
+                            class="btn btn-light btn-lg text-primary fw-semibold px-5">Talk to Astrologer</a>
+                        @auth
+                            <a href="{{ route('user.wallet.index') }}" class="btn btn-outline-light btn-lg px-4">Recharge
+                                Wallet</a>
+                        @else
+                            <a href="{{ route('register') }}" class="btn btn-outline-light btn-lg px-4">Get Started</a>
+                        @endauth
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trust Badges -->
+    <div class="bg-white py-4 border-bottom">
+        <div class="container">
+            <div class="row text-center g-4 justify-content-center text-secondary">
+                <div class="col-6 col-md-3">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-shield-check fs-4 text-primary"></i>
+                        <span class="fw-medium">100% Secure</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-people-fill fs-4 text-primary"></i>
+                        <span class="fw-medium">Verified Astrologers</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-lock-fill fs-4 text-primary"></i>
+                        <span class="fw-medium">Private & Confidential</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-headset fs-4 text-primary"></i>
+                        <span class="fw-medium">24/7 Support</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Stats / Trusted By -->
-    <div class="py-4 bg-white-05 border-top border-bottom border-white-10">
+    <!-- Featured Astrologers -->
+    <section class="py-5 bg-white">
         <div class="container">
-            <div class="row text-center g-4">
-                <div class="col-md-3 col-6">
-                    <h2 class="fw-bold text-gold">50k+</h2>
-                    <p class="text-white-50 small mb-0">Consultations</p>
-                </div>
-                <div class="col-md-3 col-6">
-                    <h2 class="fw-bold text-gold">4.8/5</h2>
-                    <p class="text-white-50 small mb-0">User Rating</p>
-                </div>
-                <div class="col-md-3 col-6">
-                    <h2 class="fw-bold text-gold">100+</h2>
-                    <p class="text-white-50 small mb-0">Verified Astrologers</p>
-                </div>
-                <div class="col-md-3 col-6">
-                    <h2 class="fw-bold text-gold">24/7</h2>
-                    <p class="text-white-50 small mb-0">Live Support</p>
-                </div>
-            </div>
-        </div>
-    </div>
+            <x-public.section-header title="Featured Astrologers" subtitle="Top rated experts available for you"
+                :center="true" />
 
-    <!-- Live Astrologers Section -->
-    <div class="py-5">
-        <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="fw-bold">{!! $sectionTitle ?? 'Meet Our <span class="text-gold">Top Experts</span>' !!}</h2>
-                <p class="text-muted">Available now for instant consultation</p>
-                @auth
-                    <a href="{{ route('user.preferences.edit') }}" class="btn btn-sm btn-outline-warning rounded-pill mt-2">
-                        <i class="fas fa-sliders-h me-1"></i> Customize Feed
-                    </a>
-                @endauth
-            </div>
-
-            <div class="row g-4 justify-content-center">
-                @forelse($featuredAstrologers as $astro)
-                    <div class="col-lg-4 col-md-6">
-                        <div class="glass-card h-100 p-0 overflow-hidden">
-                            <div class="p-4 text-center">
-                                <div class="position-relative d-inline-block d-flex justify-content-center">
-                                    <img src="{{ $astro->profile_photo_path ?? $astro->user->avatar ?? 'https://ui-avatars.com/api/?name=' . urlencode($astro->display_name ?? $astro->user->name) . '&background=FFD700&color=000' }}"
-                                        class="rounded-circle border border-2 border-warning mb-3" width="80" height="80">
-
-                                    @if($astro->recommendation_reasons)
-                                        <div
-                                            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
-                                            {{ $astro->recommendation_reasons[0] }}
-                                        </div>
-                                    @endif
-
-                                    @if($astro->is_enabled)
-                                        {{-- Assuming is_enabled maps to active status/presence for now --}}
-                                        <span
-                                            class="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle p-2"
-                                            title="Online"></span>
-                                    @endif
-                                </div>
-                                <h5>{{ $astro->display_name ?? $astro->user->name }}</h5>
-                                <p class="text-gold small mb-2">
-                                    {{ implode(', ', array_slice($astro->skills ?? [], 0, 3)) }}
-                                </p>
-                                <p class="small text-muted mb-3 line-clamp-2" style="min-height: 48px">
-                                    {{ Str::limit($astro->bio, 80) }}
-                                </p>
-
-                                <div class="d-flex justify-content-center gap-2">
-                                    <span class="badge bg-white-10 text-white border border-white-10">
-                                        <i class="fas fa-phone me-1"></i> ₹{{ (int) $astro->call_per_minute }}/min
-                                    </span>
-                                    <span class="badge bg-white-10 text-white border border-white-10">
-                                        <i class="fas fa-comment me-1"></i>
-                                        ₹{{ (int) $astro->chat_per_session }}/min
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="card-footer bg-white-05 border-top border-white-10 p-3">
-                                <a href="{{ route('astrologers.public_show', $astro->id) }}"
-                                    class="btn btn-sm btn-cosmic w-100">Consult Now</a>
-                            </div>
-                        </div>
+            <div class="row g-4">
+                @forelse($featuredAstrologers ?? [] as $astrologer)
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <x-public.astrologer-card :astrologer="$astrologer" />
                     </div>
                 @empty
-                    <div class="col-12 text-center">
-                        <p class="text-muted">No astrologers currently available.</p>
+                    <div class="col-12 text-center py-5">
+                        <div class="text-muted mb-3"><i class="bi bi-stars fs-1"></i></div>
+                        <h5>No astrologers available right now</h5>
+                        <p class="text-secondary">Please check back later.</p>
                     </div>
                 @endforelse
             </div>
 
             <div class="text-center mt-5">
-                <a href="{{ route('astrologers.index') }}" class="btn btn-outline-light rounded-pill px-4">View All
+                <a href="{{ route('user.astrologers.index') }}" class="btn btn-outline-primary px-5">View All
                     Astrologers</a>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Features Section -->
-    <div class="features py-5 bg-white-05">
+    <!-- How It Works -->
+    <section class="py-5 bg-light">
         <div class="container">
+            <x-public.section-header title="How It Works" :center="true" />
+
+            <div class="row g-4 text-center">
+                <div class="col-md-4">
+                    <div class="bg-white p-4 rounded-4 shadow-sm h-100">
+                        <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                            style="width: 60px; height: 60px;">
+                            <i class="bi bi-search fs-3"></i>
+                        </div>
+                        <h4>1. Choose Astrologer</h4>
+                        <p class="text-secondary">Browse profiles, check ratings and reviews to find your perfect guide.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="bg-white p-4 rounded-4 shadow-sm h-100">
+                        <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                            style="width: 60px; height: 60px;">
+                            <i class="bi bi-wallet2 fs-3"></i>
+                        </div>
+                        <h4>2. Recharge Wallet</h4>
+                        <p class="text-secondary">Add money to your wallet securely to start a session.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="bg-white p-4 rounded-4 shadow-sm h-100">
+                        <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                            style="width: 60px; height: 60px;">
+                            <i class="bi bi-chat-heart-fill fs-3"></i>
+                        </div>
+                        <h4>3. Connect & Chat</h4>
+                        <p class="text-secondary">Start a call or chat session and get instant answers.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Latest Blogs -->
+    <section class="py-5 bg-white">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-end mb-5">
+                <div>
+                    <h2 class="fw-bold mb-1">Latest from Blog</h2>
+                    <p class="text-secondary mb-0">Insights into your astrological journey</p>
+                </div>
+                <a href="{{ route('blogs.index') }}" class="btn btn-link text-decoration-none fw-medium">View All <i
+                        class="bi bi-arrow-right"></i></a>
+            </div>
+
             <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="glass-card text-center h-100">
-                        <div class="mb-3">
-                            <i class="fa-solid fa-comments fa-3x text-gold"></i>
-                        </div>
-                        <h4>Private Chat</h4>
-                        <p class="text-muted">Chat anonymously with expert astrologers regarding your career, love life, and
-                            finances.</p>
+                @forelse($latestBlogs ?? [] as $blog)
+                    <div class="col-md-4">
+                        <x-public.blog-card :blog="$blog" />
                     </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="glass-card text-center h-100">
-                        <div class="mb-3">
-                            <i class="fa-solid fa-phone fa-3x text-gold"></i>
-                        </div>
-                        <h4>Voice Call</h4>
-                        <p class="text-muted">Instant voice connection through our secure bridge. Your number is never
-                            shared.</p>
+                @empty
+                    <div class="col-12 text-center text-muted py-4">
+                        Writing stars are aligning for our first post...
                     </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="glass-card text-center h-100">
-                        <div class="mb-3">
-                            <i class="fa-solid fa-robot fa-3x text-gold"></i>
-                        </div>
-                        <h4>AI Predictions</h4>
-                        <p class="text-muted">Get instant answers from our AI Vedic Assistant powered by real astronomical
-                            data.</p>
-                    </div>
-                </div>
+                @endforelse
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="cta-section py-5 text-center">
+    <!-- FAQ -->
+    <section class="py-5 bg-light">
         <div class="container">
-            <div class="glass-card p-5">
-                <h2 class="mb-3">Start your journey today</h2>
-                <p class="mb-4">First chat is free for new users!</p>
-                <a href="{{ route('login') }}" class="btn btn-cosmic">Sign Up Now</a>
+            <x-public.section-header title="Frequently Asked Questions" :center="true" />
+
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="accordion accordion-flush bg-white rounded shadow-sm" id="faqAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed fw-medium" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#faq1">
+                                    Is my consultation private?
+                                </button>
+                            </h2>
+                            <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body text-secondary">
+                                    Yes, 100%. Your privacy is our top priority. All calls and chats are completely
+                                    confidential and secure.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed fw-medium" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#faq2">
+                                    How do I pay for sessions?
+                                </button>
+                            </h2>
+                            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body text-secondary">
+                                    You can recharge your wallet using UPI, Credit/Debit cards, or Net Banking. The amount
+                                    is deducted per minute as you chat or speak.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed fw-medium" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#faq3">
+                                    Can I review my astrologer?
+                                </button>
+                            </h2>
+                            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body text-secondary">
+                                    Absolutely! After every session, you can rate and review your experience to help others
+                                    finding the right guide.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="py-5 bg-primary text-white text-center">
+        <div class="container">
+            <h2 class="fw-bold mb-3">Ready to find your answers?</h2>
+            <p class="lead mb-4 opacity-90">Join thousands of satisfied users today.</p>
+            <a href="{{ route('user.astrologers.index') }}" class="btn btn-light btn-lg fw-semibold px-5">Start Consultation
+                Today</a>
+        </div>
+    </section>
+
 @endsection

@@ -45,4 +45,9 @@ class UserPolicy
     {
         return $user->hasRole('Super Admin');
     }
+
+    public function block(User $user, User $model): bool
+    {
+        return $user->hasAnyRole(['Super Admin', 'Admin', 'Support Admin', 'Ops Admin']);
+    }
 }

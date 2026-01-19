@@ -4,8 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\CallSession;
 use App\Models\User;
-use App\Services\CallerDeskService;
+use App\Models\AstrologerProfile;
+use App\Models\PricingSetting;
+use App\Models\WebhookEvent;
+use App\Services\CallerDeskClient;
 use App\Services\WalletService;
+use App\Services\WebhookPayloadMasker;
+use App\Jobs\ProcessCallerDeskWebhook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +22,7 @@ class CallController extends Controller
     protected $walletService;
     protected $membershipService;
 
-    public function __construct(CallerDeskService $callerDesk, WalletService $walletService, \App\Services\MembershipService $membershipService)
+    public function __construct(CallerDeskClient $callerDesk, WalletService $walletService, \App\Services\MembershipService $membershipService)
     {
         $this->callerDesk = $callerDesk;
         $this->walletService = $walletService;
@@ -27,16 +32,18 @@ class CallController extends Controller
     public function initiate(Request $request)
     {
         $request->validate([
-            'astrologer_id' => 'required|exists:users,id',
+            'astrologer_id' => 'required',
         ]);
 
         $user = $request->user();
-        $astrologer = User::role('Astrologer')
-            ->where('id', $request->astrologer_id)
-            ->with('astrologerProfile')
-            ->firstOrFail();
-
-        $profile = $astrologer->astrologerProfile;
+        $profile = AstrologerProfile::find($request->astrologer_id);
+        if (!$profile) {
+            $astrologer = User::role('Astrologer')
+                ->where('id', $request->astrologer_id)
+                ->with('astrologerProfile')
+                ->firstOrFail();
+            $profile = $astrologer->astrologerProfile;
+        }
 
         if (!$profile) {
             return response()->json(['message' => 'Astrologer profile is unavailable for calls.'], 422);
@@ -52,10 +59,10 @@ class CallController extends Controller
         }
 
         // Pricing Gate: Min Balance
-        $minWallet = \App\Models\PricingSetting::get('min_wallet_to_start_call', 50);
+        $minWallet = (float) PricingSetting::get('min_wallet_to_start_call', 50);
         if (!$this->walletService->hasBalance($user, $minWallet)) {
             return response()->json([
-                'message' => "Insufficient wallet balance. You need at least ₹{$minWallet} to start a call."
+                'message' => "Insufficient wallet balance. You need at least INR {$minWallet} to start a call."
             ], 402);
         }
 
@@ -64,7 +71,7 @@ class CallController extends Controller
         $discountData = $this->membershipService->calculateDiscount($user, 'call', $baseRate);
         $finalRate = $discountData['final_amount'];
 
-        $holdDuration = \App\Models\PricingSetting::get('call_hold_duration_minutes', 5);
+        $holdDuration = (int) PricingSetting::get('call_hold_duration_minutes', 5);
         $holdAmount = $finalRate * $holdDuration;
 
         if (!$this->walletService->hasBalance($user, $holdAmount)) {
@@ -72,7 +79,7 @@ class CallController extends Controller
         }
 
         // Create Session
-        $callId = 'CALL_' . Str::uuid();
+        $callId = (string) Str::uuid();
 
         // 1. Create Wallet Hold
         try {
@@ -84,36 +91,55 @@ class CallController extends Controller
 
         $session = CallSession::create([
             'user_id' => $user->id,
-            'astrologer_user_id' => $astrologer->id,
+            'astrologer_profile_id' => $profile->id,
+            'provider' => 'callerdesk',
             'status' => 'initiated',
             'rate_per_minute' => $finalRate,
-            'callerdesk_call_id' => $callId,
-            'meta' => ['wallet_hold_id' => $hold->id, 'discount_applied' => $discountData['discount'] > 0 ? $discountData : null],
+            'wallet_hold_id' => $hold->id,
+            'user_masked_identifier' => 'User #' . substr((string) $user->id, -4),
+            'astrologer_masked_identifier' => 'Astrologer #' . substr((string) $profile->id, -4),
+            'commission_percent_snapshot' => (float) PricingSetting::get('platform_commission_percent', 20),
+            'meta_json' => ['wallet_hold_id' => $hold->id, 'discount_applied' => $discountData['discount'] > 0 ? $discountData : null],
         ]);
 
         // Initiate Call
-        $response = $this->callerDesk->initiateCall($user->phone, $astrologer->phone, $callId);
+        try {
+            $response = $this->callerDesk->initiateMaskedCall($user->phone, $profile->user->phone, [
+                'call_session_id' => $session->id,
+                'user_id' => $user->id,
+                'astrologer_profile_id' => $profile->id,
+            ]);
+        } catch (\Exception $e) {
+            $this->walletService->releaseHold($hold);
+            $session->update(['status' => 'failed', 'meta_json' => array_merge($session->meta_json ?? [], ['error' => $e->getMessage()])]);
+            return response()->json(['status' => 'error', 'message' => 'Failed to initiate call'], 502);
+        }
 
         if ($response) {
             $session->update([
                 'status' => 'connecting',
-                'meta' => ['api_response' => $response]
+                'provider_call_id' => $response['provider_call_id'] ?? $callId,
+                'meta_json' => array_merge($session->meta_json ?? [], ['api_response' => $response])
             ]);
 
             // Notify Astrologer
             \App\Jobs\SendPushNotificationJob::dispatch(
-                $astrologer->id,
+                $profile->user_id,
                 'call_incoming',
                 [
-                    'call_session_id' => $callId,
+                    'call_session_id' => $session->id,
                     'user_name' => "User #{$user->id}", // Masked Identity
-                    'deeplink' => "app://calls/{$callId}"
+                    'deeplink' => "app://calls/{$session->id}"
                 ],
                 'Incoming Call',
                 "New call request from User #{$user->id}"
             );
 
-            return response()->json(['status' => 'success', 'call_id' => $callId]);
+            return response()->json([
+                'status' => 'success',
+                'call_id' => $session->id,
+                'provider_call_id' => $session->provider_call_id
+            ]);
         }
 
         $session->update(['status' => 'failed']);
@@ -122,114 +148,31 @@ class CallController extends Controller
 
     public function webhook(Request $request)
     {
-        // Example Payload: { reference_id, status, duration, start_time, end_time }
-        // Adapt based on actual CallerDesk docs
+        $payload = $request->getContent();
+        $rawHeaders = $request->headers->all();
+        $headers = WebhookPayloadMasker::mask($rawHeaders);
+        $data = $request->all();
+        $providerCallId = $data['call_id'] ?? ($data['provider_call_id'] ?? ($data['reference_id'] ?? null));
 
-        $callId = $request->reference_id;
-        $status = $request->status; // completed, failed, busy, no-answer
-        $duration = $request->duration ?? 0; // seconds
+        $isValid = $this->callerDesk->verifyWebhookSignature($payload, $rawHeaders);
 
-        $session = CallSession::where('callerdesk_call_id', $callId)->first();
+        $event = WebhookEvent::create([
+            'provider' => 'callerdesk',
+            'event_type' => $data['event'] ?? ($data['status'] ?? 'status_update'),
+            'external_id' => $providerCallId,
+            'signature_valid' => $isValid,
+            'payload' => WebhookPayloadMasker::mask($data),
+            'headers' => $headers,
+            'processing_status' => $isValid ? 'pending' : 'failed',
+            'error_message' => $isValid ? null : 'Invalid signature',
+        ]);
 
-        if (!$session) {
-            return response()->json(['message' => 'Session not found'], 404);
+        if (!$isValid) {
+            return response()->json(['status' => 'received', 'warning' => 'invalid_signature']);
         }
 
-        if ($session->status === 'completed' || $session->status === 'failed') {
-            return response()->json(['message' => 'Already processed']);
-        }
+        ProcessCallerDeskWebhook::dispatch($event->id);
 
-        DB::transaction(function () use ($session, $status, $duration, $request) {
-            $session->update([
-                'status' => $status === 'completed' ? 'completed' : ($status === 'active' ? 'active' : 'failed'),
-                'duration_seconds' => $duration,
-                'ended_at' => $status === 'completed' ? now() : null,
-                'meta' => array_merge($session->meta ?? [], ['webhook' => $request->all()]),
-            ]);
-
-            // Call Started (Answered)
-            if ($status === 'active' && $session->status !== 'active') { // Idempotency check
-                \App\Jobs\SendPushNotificationJob::dispatch(
-                    $session->user_id,
-                    'call_started',
-                    ['call_session_id' => $session->callerdesk_call_id, 'deeplink' => "app://calls/{$session->callerdesk_call_id}"],
-                    'Call Connected',
-                    "You are now connected with {$session->astrologer->name}."
-                );
-                return; // Exit transaction early for active state
-            }
-
-            // Retrieve Hold
-            $holdId = $session->meta['wallet_hold_id'] ?? null;
-            $hold = $holdId ? \App\Models\WalletHold::find($holdId) : null;
-
-            if ($status === 'completed' && $duration > 0) {
-                $mins = ceil($duration / 60);
-                $cost = $mins * $session->rate_per_minute;
-                $session->update(['cost' => $cost]);
-
-                if ($hold) {
-                    // Consume Hold for exact cost amount
-                    // If cost > hold, consumeHold handles the logic (up to hold amount + extra debit? Or simplified)
-                    // Our service simplified logic: consume hold, release rest, debit shortage.
-                    // The `consumeHold` logic I implemented does: if cost > hold, debit extra. If cost < hold, refund difference.
-                    $this->walletService->consumeHold($hold, $cost);
-                } else {
-                    // Fallback if no hold (should not happen in new flow but safe to keep)
-                    try {
-                        $this->walletService->debit($session->user, $cost, 'call', $session->id, "Call with {$session->astrologer->name} ($mins mins)");
-                    } catch (\Exception $e) { /* Log error */
-                    }
-                }
-
-                // Credit Astrologer
-                $commission = 0.70;
-                $earning = $cost * $commission;
-                $this->walletService->credit(
-                    $session->astrologer,
-                    $earning,
-                    'call_earning',
-                    $session->id,
-                    "Earning from call with {$session->user->name}"
-                );
-
-                // Notify User: Call Ended
-                \App\Jobs\SendPushNotificationJob::dispatch(
-                    $session->user_id,
-                    'call_ended',
-                    [
-                        'call_session_id' => $session->callerdesk_call_id,
-                        'duration' => (string) $mins,
-                        'cost' => (string) $cost,
-                        'deeplink' => "app://calls/{$session->callerdesk_call_id}/summary"
-                    ],
-                    'Call Summary',
-                    "Call ended. Duration: {$mins} mins. Cost: INR {$cost}."
-                );
-
-            } else {
-                // Failed/Busy/No Answer -> Release Hold
-                if ($hold) {
-                    $this->walletService->releaseHold($hold);
-                }
-
-                // Notify Astrologer: Missed Call (if busy/no-answer)
-                if (in_array($status, ['busy', 'no-answer', 'failed'])) {
-                    \App\Jobs\SendPushNotificationJob::dispatch(
-                        $session->astrologer_user_id,
-                        'call_missed',
-                        [
-                            'call_session_id' => $session->callerdesk_call_id,
-                            'timestamp' => now()->toIso8601String(),
-                            'deeplink' => "app://calls/history"
-                        ],
-                        'Missed Call',
-                        "You missed a call from User #{$session->user_id}."
-                    );
-                }
-            }
-        });
-
-        return response()->json(['status' => 'success']);
+        return response()->json(['status' => 'received', 'event_id' => $event->id]);
     }
 }

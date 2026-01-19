@@ -37,13 +37,13 @@ class ChatTest extends TestCase
         $response = $this->postJson('/api/chat/initiate', ['astrologer_id' => $astro->id]);
 
         $response->assertOk()
-            ->assertJsonStructure(['status', 'chat_id', 'firebase_chat_id']);
+            ->assertJsonStructure(['status', 'chat_id', 'firebase_chat_id', 'price_per_message']);
 
         $this->assertDatabaseHas('chat_sessions', [
             'user_id' => $user->id,
-            'astrologer_user_id' => $astro->id,
+            'astrologer_profile_id' => $astro->astrologerProfile->id,
             'status' => 'active',
-            'rate_per_minute' => 10.00
+            'price_per_message' => 10.00
         ]);
     }
 

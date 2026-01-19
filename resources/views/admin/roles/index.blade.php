@@ -38,7 +38,8 @@
                             <i class="fas fa-edit"></i>
                         </a>
                         <form action="{{ route('admin.roles.destroy', $role->id) }}" method="POST" class="d-inline"
-                            onsubmit="return confirm('Are you sure? This will remove this role from all users.');">
+                            data-confirm data-confirm-title="Delete Role"
+                            data-confirm-text="Remove this role from all users?">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn btn-sm btn-light rounded-circle text-danger" data-bs-toggle="tooltip"

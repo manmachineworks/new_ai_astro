@@ -18,7 +18,12 @@ class AiSettingsController extends Controller
             'ai_chat_price_per_session',
             'ai_chat_min_wallet_to_start',
             'ai_chat_max_messages_per_day',
-            'ai_chat_disclaimer_text'
+            'ai_chat_disclaimer_text',
+            'astrology_api_base_url',
+            'astrology_api_user_id',
+            'astrology_api_key',
+            'astrology_api_timeout',
+            'ai_chat_rate_limit_per_min'
         ];
 
         $settings = [];
@@ -39,10 +44,19 @@ class AiSettingsController extends Controller
             'ai_chat_min_wallet_to_start' => 'required|numeric|min:0',
             'ai_chat_max_messages_per_day' => 'required|integer|min:1',
             'ai_chat_disclaimer_text' => 'required|string|max:1000',
+            'astrology_api_base_url' => 'nullable|string|max:255',
+            'astrology_api_user_id' => 'nullable|string|max:255',
+            'astrology_api_key' => 'nullable|string|max:255',
+            'astrology_api_timeout' => 'nullable|integer|min:1|max:120',
+            'ai_chat_rate_limit_per_min' => 'nullable|integer|min:1|max:120',
         ]);
 
         // Fix boolean checkbox
         $validated['ai_chat_enabled'] = $request->has('ai_chat_enabled') ? 1 : 0;
+
+        if (empty($validated['astrology_api_key'])) {
+            unset($validated['astrology_api_key']);
+        }
 
         foreach ($validated as $key => $value) {
             PricingSetting::updateOrCreate(

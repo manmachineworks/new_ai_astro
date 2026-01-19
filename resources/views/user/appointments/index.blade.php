@@ -1,60 +1,46 @@
-@extends('layouts.app')
+@extends('layouts.user')
+
+@section('header')
+    <x-ui.page-header title="My Appointments" description="Manage your scheduled sessions." />
+@endsection
 
 @section('content')
-    <div class="container py-4">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">My Appointments</h5>
-                <span class="text-muted small">Timezone: {{ $tz }}</span>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>Date / Time</th>
-                            <th>Astrologer</th>
-                            <th>Status</th>
-                            <th>Amount</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($appointments as $appointment)
-                            <tr>
-                                <td>
-                                    <div>{{ $appointment->start_at_utc->copy()->tz($tz)->format('M d, Y') }}</div>
-                                    <small class="text-muted">{{ $appointment->start_at_utc->copy()->tz($tz)->format('h:i A') }}</small>
-                                </td>
-                                <td>
-                                    {{ $appointment->astrologerProfile?->display_name ?? 'Astrologer' }}
-                                </td>
-                                <td>
-                                    <span class="badge rounded-pill
-                                        @if($appointment->status === 'confirmed') bg-success
-                                        @elseif($appointment->status === 'requested') bg-warning text-dark
-                                        @elseif(str_contains($appointment->status, 'cancelled')) bg-danger
-                                        @else bg-secondary @endif">
-                                        {{ ucfirst(str_replace('_', ' ', $appointment->status)) }}
-                                    </span>
-                                </td>
-                                <td>ƒ,1{{ number_format($appointment->price_total, 2) }}</td>
-                                <td>
-                                    <a class="btn btn-sm btn-outline-primary" href="{{ route('appointments.show', $appointment->id) }}">
-                                        View
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">No appointments yet.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer bg-white">
-                {{ $appointments->links() }}
+    <x-ui.tabs :tabs="['upcoming' => 'Upcoming', 'past' => 'Past']" active="upcoming">
+        {{-- Upcoming Tab --}}
+        <div x-show="activeTab === 'upcoming'">
+            <div class="row g-4">
+                @forelse($upcomingAppointments as $appointment)
+                    <div class="col-12">
+                        <x-user.appointment-card :appointment="$appointment" />
+                    </div>
+                @empty
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm p-5 text-center">
+                            <x-ui.empty-state title="No upcoming appointments"
+                                description="Book a session with our expert astrologers."
+                                action='<a href="{{ route("user.astrologers.index") }}" class="btn btn-primary px-4 mt-3 shadow-sm">Book Now</a>' />
+                        </div>
+                    </div>
+                @endforelse
             </div>
         </div>
-    </div>
+
+        {{-- Past Tab --}}
+        <div x-show="activeTab === 'past'" style="display: none;">
+            <div class="row g-4">
+                @forelse($pastAppointments as $appointment)
+                    <div class="col-12">
+                        <x-user.appointment-card :appointment="$appointment" />
+                    </div>
+                @empty
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm p-5 text-center">
+                            <x-ui.empty-state title="No past appointments"
+                                description="Your completed sessions will appear here." />
+                        </div>
+                    </div>
+                @endforelse
+            </div>
+        </div>
+    </x-ui.tabs>
 @endsection

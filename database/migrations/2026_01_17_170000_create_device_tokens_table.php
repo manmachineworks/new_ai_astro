@@ -13,9 +13,8 @@ return new class extends Migration {
             $table->string('role')->nullable(); // user, astrologer, admin
             $table->string('platform')->default('android'); // android, ios, web
 
-            // FCM Token: String 500 for indexing support (standard is ~160, max 4kb)
-            // Using 500 is safe balance. Unique index ensures no duplicates.
-            $table->string('fcm_token', 500)->unique();
+            // FCM tokens can be long; 191 keeps the unique index under MySQL key limits.
+            $table->string('fcm_token', 191)->unique();
 
             $table->string('device_id')->nullable(); // Hardware ID
             $table->string('app_version')->nullable();

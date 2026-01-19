@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AdminActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -60,11 +61,18 @@ class AdminAuthController extends Controller
 
         $request->session()->regenerate();
 
+        AdminActivityLogger::log('admin.login', $user);
+
         return redirect()->route('admin.dashboard');
     }
 
     public function logout(Request $request)
     {
+        $user = $request->user();
+        if ($user) {
+            AdminActivityLogger::log('admin.logout', $user);
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

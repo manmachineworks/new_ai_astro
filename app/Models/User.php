@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -26,9 +28,15 @@ class User extends Authenticatable
         'avatar',
         'wallet_balance',
         'is_active',
+        'blocked_at',
+        'blocked_until',
+        'blocked_reason',
+        'blocked_by_admin_id',
+        'unblocked_at',
         'firebase_uid',
         'last_seen_at',
         'preferred_locale',
+        'role',
     ];
 
     /**
@@ -52,12 +60,20 @@ class User extends Authenticatable
         'wallet_balance' => 'decimal:2',
         'is_active' => 'boolean',
         'last_seen_at' => 'datetime',
+        'blocked_at' => 'datetime',
+        'blocked_until' => 'datetime',
+        'unblocked_at' => 'datetime',
     ];
 
 
     public function preferences(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(UserPreference::class);
+    }
+
+    public function profile(): HasOne
+    {
+        return $this->hasOne(UserProfile::class);
     }
 
     public function memberships()
@@ -109,5 +125,45 @@ class User extends Authenticatable
     public function referralAsInvitee()
     {
         return $this->hasOne(\App\Models\Referral::class, 'invitee_user_id');
+    }
+
+    public function astrologer(): HasOne
+    {
+        return $this->hasOne(Astrologer::class);
+    }
+
+    public function wallet(): HasOne
+    {
+        return $this->hasOne(Wallet::class);
+    }
+
+    public function walletTransactions(): HasMany
+    {
+        return $this->hasMany(WalletTransaction::class);
+    }
+
+    public function latestWalletTransaction()
+    {
+        return $this->hasOne(WalletTransaction::class)->latestOfMany();
+    }
+
+    public function callLogs(): HasMany
+    {
+        return $this->hasMany(CallLog::class);
+    }
+
+    public function chatSessions(): HasMany
+    {
+        return $this->hasMany(ChatSession::class);
+    }
+
+    public function publicId(): string
+    {
+        return 'USER-' . Str::padLeft((string) $this->id, 5, '0');
+    }
+
+    public function isAstrologer(): bool
+    {
+        return $this->role === 'astrologer' || $this->hasRole('Astrologer');
     }
 }

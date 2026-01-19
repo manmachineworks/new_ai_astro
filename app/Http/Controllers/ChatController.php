@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\ChatSession;
 use App\Models\ChatMessageCharge;
+use App\Models\ChatReport;
 use App\Models\AstrologerProfile;
+use App\Models\AstrologerEarningsLedger;
+use App\Models\PricingSetting;
+use App\Models\User;
 use App\Services\FirebaseService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
@@ -76,13 +80,25 @@ class ChatController extends Controller
         return response()->json(['firebase_token' => $token, 'uid' => $uid]);
     }
 
+    public function initiate(Request $request)
+    {
+        return $this->start($request);
+    }
+
     // start method modification
     public function start(Request $request)
     {
-        $request->validate(['astrologer_id' => 'required|exists:astrologer_profiles,id']);
+        $request->validate(['astrologer_id' => 'required']);
         $user = $request->user();
         $astroId = $request->astrologer_id;
-        $astro = AstrologerProfile::findOrFail($astroId);
+        $astro = AstrologerProfile::find($astroId);
+        if (!$astro) {
+            $astroUser = User::role('Astrologer')->where('id', $astroId)->firstOrFail();
+            $astro = $astroUser->astrologerProfile;
+        }
+        if (!$astro) {
+            return response()->json(['error' => 'Astrologer profile not found'], 404);
+        }
 
         // Security check
         if (!$astro->is_verified || !$astro->is_chat_enabled) {
@@ -90,7 +106,7 @@ class ChatController extends Controller
         }
 
         // Wallet check
-        $minBalance = config('firebase.billing.min_wallet_to_start', 50);
+        $minBalance = (float) PricingSetting::get('min_wallet_to_start_chat', config('firebase.billing.min_wallet_to_start', 50));
         if ($user->wallet_balance < $minBalance) {
             return response()->json(['error' => 'Insufficient balance to start chat'], 402);
         }
@@ -102,18 +118,25 @@ class ChatController extends Controller
 
         if (!$session) {
             // Calculate Price with Membership Discount
-            $basePrice = $astro->chat_per_session > 0 ? $astro->chat_per_session : config('firebase.billing.price_per_message');
+            $basePrice = $astro->chat_per_session > 0
+                ? $astro->chat_per_session
+                : (float) PricingSetting::get('chat_price_per_message', config('firebase.billing.price_per_message', 5));
             $discountData = $this->membershipService->calculateDiscount($user, 'chat', $basePrice);
             $finalPrice = $discountData['final_amount'];
+            $commissionSnapshot = (float) PricingSetting::get('platform_commission_percent', 20);
 
+            $conversationId = 'conv_' . Str::random(20);
             $session = ChatSession::create([
                 'user_id' => $user->id,
+                'astrologer_user_id' => $astro->user_id,
                 'astrologer_profile_id' => $astro->id,
-                'conversation_id' => 'conv_' . Str::random(20),
+                'conversation_id' => $conversationId,
+                'firebase_chat_id' => $conversationId,
                 'pricing_mode' => 'per_message',
                 'price_per_message' => $finalPrice,
                 'status' => 'active',
                 'started_at' => now(),
+                'commission_percent_snapshot' => $commissionSnapshot,
             ]);
 
             // Should logging occur?
@@ -122,9 +145,11 @@ class ChatController extends Controller
         }
 
         return response()->json([
-            'session_id' => $session->id,
+            'status' => 'active',
+            'chat_id' => $session->id,
+            'firebase_chat_id' => $session->firebase_chat_id ?? $session->conversation_id,
             'conversation_id' => $session->conversation_id,
-            'price_per_message' => $session->price_per_message
+            'price_per_message' => $session->price_per_message,
         ]);
     }
 
@@ -207,6 +232,18 @@ class ChatController extends Controller
                 $commAmt = ($amount * $session->commission_percent_snapshot) / 100;
                 $session->increment('commission_amount_total', $commAmt);
 
+                $earningsAmount = $amount - $commAmt;
+                if ($earningsAmount > 0) {
+                    AstrologerEarningsLedger::create([
+                        'astrologer_profile_id' => $session->astrologer_profile_id,
+                        'source' => 'chat',
+                        'reference_type' => ChatSession::class,
+                        'reference_id' => $session->id,
+                        'amount' => $earningsAmount,
+                        'status' => 'available',
+                    ]);
+                }
+
                 // Notifications Dispatch
                 $recipientProfile = $session->astrologerProfile;
                 $recipientUser = $recipientProfile->user;
@@ -234,5 +271,70 @@ class ChatController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    public function end(Request $request)
+    {
+        $validated = $request->validate([
+            'session_id' => 'nullable|exists:chat_sessions,id',
+            'conversation_id' => 'nullable|string',
+        ]);
+
+        if (empty($validated['session_id']) && empty($validated['conversation_id'])) {
+            return response()->json(['error' => 'session_id or conversation_id required'], 422);
+        }
+
+        $sessionQuery = ChatSession::query();
+        if (!empty($validated['session_id'])) {
+            $sessionQuery->where('id', $validated['session_id']);
+        } else {
+            $sessionQuery->where('conversation_id', $validated['conversation_id']);
+        }
+
+        $session = $sessionQuery->firstOrFail();
+        $user = $request->user();
+
+        $isParticipant = $session->user_id === $user->id;
+        if (!$isParticipant && $user->hasRole('Astrologer')) {
+            $isParticipant = $session->astrologer_profile_id === ($user->astrologerProfile->id ?? null);
+        }
+        if (!$isParticipant) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $session->update([
+            'status' => 'completed',
+            'ended_at' => now(),
+        ]);
+
+        app(\App\Services\ChatService::class)->endFirebaseConversation($session->firebase_chat_id ?? $session->conversation_id);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function report(Request $request, ChatSession $session)
+    {
+        $validated = $request->validate([
+            'reason' => 'required|string|max:100',
+            'details' => 'nullable|string|max:1000',
+        ]);
+
+        $user = $request->user();
+        $isParticipant = $session->user_id === $user->id;
+        if (!$isParticipant && $user->hasRole('Astrologer')) {
+            $isParticipant = $session->astrologer_profile_id === ($user->astrologerProfile->id ?? null);
+        }
+        if (!$isParticipant) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        ChatReport::create([
+            'chat_session_id' => $session->id,
+            'reported_by_user_id' => $user->id,
+            'reason' => $validated['reason'],
+            'details' => $validated['details'] ?? null,
+        ]);
+
+        return response()->json(['success' => true]);
     }
 }

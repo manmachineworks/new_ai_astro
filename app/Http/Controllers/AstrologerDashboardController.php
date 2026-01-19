@@ -6,6 +6,7 @@ use App\Models\AstrologerProfile;
 use App\Models\AvailabilityRule;
 use App\Models\CallSession;
 use App\Models\ChatSession;
+use App\Models\AstrologerPricingHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -115,6 +116,8 @@ class AstrologerDashboardController extends Controller
         ]);
 
         $profile = $this->getProfile();
+        $oldCall = $profile->call_per_minute;
+        $oldChat = $profile->chat_per_session;
 
         // Cannot enable if not verified
         if (!$profile->is_verified) {
@@ -128,7 +131,20 @@ class AstrologerDashboardController extends Controller
             'chat_per_session' => $request->chat_per_session,
             'is_call_enabled' => $request->has('is_call_enabled') && $profile->is_verified,
             'is_chat_enabled' => $request->has('is_chat_enabled') && $profile->is_verified,
+            'is_appointment_enabled' => $request->has('is_appointment_enabled') && $profile->is_verified,
         ]);
+
+        if ($oldCall != $profile->call_per_minute || $oldChat != $profile->chat_per_session) {
+            AstrologerPricingHistory::create([
+                'astrologer_profile_id' => $profile->id,
+                'old_call_per_minute' => $oldCall,
+                'new_call_per_minute' => $profile->call_per_minute,
+                'old_chat_per_session' => $oldChat,
+                'new_chat_per_session' => $profile->chat_per_session,
+                'changed_by_user_id' => Auth::id(),
+                'change_source' => 'astrologer',
+            ]);
+        }
 
         return back()->with('success', 'Services & Pricing updated.');
     }

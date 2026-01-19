@@ -86,6 +86,36 @@
                             </div>
                         </div>
 
+                        <h6 class="text-uppercase text-muted small border-bottom pb-2 mb-3 mt-2">Provider Settings</h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">AstrologyAPI Base URL</label>
+                            <input type="text" name="astrology_api_base_url" class="form-control"
+                                value="{{ $settings['astrology_api_base_url'] ?? config('astrologyapi.base_url') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">AstrologyAPI User ID</label>
+                            <input type="text" name="astrology_api_user_id" class="form-control"
+                                value="{{ $settings['astrology_api_user_id'] ?? config('astrologyapi.user_id') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">AstrologyAPI Key</label>
+                            <input type="password" name="astrology_api_key" class="form-control"
+                                placeholder="Leave blank to keep current">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Request Timeout (seconds)</label>
+                                <input type="number" name="astrology_api_timeout" class="form-control"
+                                    value="{{ $settings['astrology_api_timeout'] ?? config('astrologyapi.timeout') }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Rate Limit / Min</label>
+                                <input type="number" name="ai_chat_rate_limit_per_min" class="form-control"
+                                    value="{{ $settings['ai_chat_rate_limit_per_min'] ?? config('astrologyapi.limits.rate_limit_per_min') }}">
+                            </div>
+                        </div>
+
                         <h6 class="text-uppercase text-muted small border-bottom pb-2 mb-3 mt-2">Legal & Content</h6>
 
                         <div class="mb-3">
@@ -115,12 +145,14 @@
                     <h6 class="fw-bold">Provider Status</h6>
                     <ul class="list-unstyled small mb-0">
                         <li class="d-flex justify-content-between mb-1">
-                            <span>Gemini API:</span>
-                            <span class="badge bg-success">Configured</span>
+                            <span>AstrologyAPI:</span>
+                            <span class="badge bg-{{ !empty($settings['astrology_api_user_id']) ? 'success' : 'secondary' }}">
+                                {{ !empty($settings['astrology_api_user_id']) ? 'Configured' : 'Missing' }}
+                            </span>
                         </li>
                         <li class="d-flex justify-content-between">
-                            <span>Model:</span>
-                            <span class="text-muted">gemini-1.5-flash</span>
+                            <span>Endpoint:</span>
+                            <span class="text-muted">{{ $settings['astrology_api_base_url'] ?? config('astrologyapi.base_url') }}</span>
                         </li>
                     </ul>
                 </div>

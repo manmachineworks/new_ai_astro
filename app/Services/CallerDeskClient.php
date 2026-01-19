@@ -83,6 +83,9 @@ class CallerDeskClient
         }
 
         $receivedSignature = $headers['x-callerdesk-signature'] ?? '';
+        if (is_array($receivedSignature)) {
+            $receivedSignature = $receivedSignature[0] ?? '';
+        }
         $expectedSignature = hash_hmac('sha256', $payload, $this->webhookSecret);
 
         return hash_equals($expectedSignature, $receivedSignature);

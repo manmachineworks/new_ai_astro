@@ -5,12 +5,62 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold m-0 text-dark">User Management</h2>
-        <a href="{{ route('admin.users.index') }}" class="btn btn-primary rounded-pill px-4 disabled">
-            <i class="fas fa-user-plus me-2"></i>Create User
+        <a href="{{ route('admin.users.index', array_merge(request()->query(), ['export' => 'csv'])) }}"
+            class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fas fa-file-csv me-2"></i>Export CSV
         </a>
     </div>
 
-    <x-admin.filter-bar :action="route('admin.users.index')" :filters="['date', 'status', 'export', 'search']" />
+    <div class="card shadow-sm border-0 rounded-4 mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ route('admin.users.index') }}" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Search</label>
+                    <input type="text" name="search" value="{{ request('search') }}" class="form-control"
+                        placeholder="Name, email, phone">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All</option>
+                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                        <option value="blocked" @selected(request('status') === 'blocked')>Blocked</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Role</label>
+                    <select name="role" class="form-select">
+                        <option value="">All</option>
+                        @foreach($roles as $role)
+                            <option value="{{ $role->name }}" @selected(request('role') === $role->name)>{{ $role->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Joined From</label>
+                    <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Joined To</label>
+                    <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Wallet Min</label>
+                    <input type="number" step="0.01" min="0" name="wallet_min" value="{{ request('wallet_min') }}"
+                        class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Wallet Max</label>
+                    <input type="number" step="0.01" min="0" name="wallet_max" value="{{ request('wallet_max') }}"
+                        class="form-control">
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    <a href="{{ route('admin.users.index') }}" class="btn btn-light w-100">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <form action="{{ route('admin.users.bulk_action') }}" method="POST" id="bulkActionForm">
         @csrf
@@ -43,11 +93,11 @@
                             </th>
                             <th>User</th>
                             <th>Wallet</th>
-                            <th>Status</th>
-                            <th>Registered</th>
-                            <th class="text-end pe-4">Actions</th>
-                        </tr>
-                    </thead>
+                        <th>Status</th>
+                        <th>Registered</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
                     <tbody>
                         @forelse($users as $user)
                             <tr>

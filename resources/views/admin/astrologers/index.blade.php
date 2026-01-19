@@ -5,10 +5,44 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold m-0 text-dark">Astrologers</h2>
-        <!-- Stats or other top-right items -->
+        <a href="{{ route('admin.astrologers.index', array_merge(request()->query(), ['export' => 'csv'])) }}"
+            class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fas fa-file-csv me-2"></i>Export CSV
+        </a>
     </div>
 
-    <x-admin.filter-bar :action="route('admin.astrologers.index')" :filters="['search', 'status', 'export']" />
+    <div class="card shadow-sm border-0 rounded-4 mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ route('admin.astrologers.index') }}" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Search</label>
+                    <input type="text" name="search" value="{{ request('search') }}" class="form-control"
+                        placeholder="Name, email, phone, display name">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Verification</label>
+                    <select name="status" class="form-select">
+                        <option value="">All</option>
+                        @foreach(['pending','approved','verified','rejected'] as $status)
+                            <option value="{{ $status }}" @selected(request('status') === $status)>{{ ucfirst($status) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Visibility</label>
+                    <select name="visible" class="form-select">
+                        <option value="">All</option>
+                        <option value="1" @selected(request('visible') === '1')>Visible</option>
+                        <option value="0" @selected(request('visible') === '0')>Hidden</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    <a href="{{ route('admin.astrologers.index') }}" class="btn btn-light w-100">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <form action="{{ route('admin.astrologers.bulk_action') }}" method="POST" id="bulkActionForm">
         @csrf

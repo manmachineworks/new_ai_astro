@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -26,7 +27,13 @@ return new class extends Migration {
         });
 
         // Create composite index with prefix to fit MySQL 1000-byte limit
-        \DB::statement('CREATE INDEX idx_ref_type_id ON promo_redemptions (reference_type(100), reference_id(100))');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('CREATE INDEX idx_ref_type_id ON promo_redemptions (reference_type(100), reference_id(100))');
+        } else {
+            Schema::table('promo_redemptions', function (Blueprint $table) {
+                $table->index(['reference_type', 'reference_id'], 'idx_ref_type_id');
+            });
+        }
     }
 
     public function down(): void

@@ -34,7 +34,7 @@ class WalletService
             $lockedUser->wallet_balance = $afterBalance;
             $lockedUser->save();
 
-            return WalletTransaction::create([
+            $txn = WalletTransaction::create([
                 'user_id' => $user->id,
                 'amount' => $amount,
                 'type' => 'credit',

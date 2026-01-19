@@ -1,94 +1,72 @@
-@extends('layouts.app')
+@extends('layouts.user')
+
+@section('header')
+    <x-ui.page-header title="Recharge Wallet" description="Add money to your wallet to consult with astrologers."
+        :breadcrumbs="[['label' => 'Wallet', 'url' => route('user.wallet.index')], ['label' => 'Recharge']]" />
+@endsection
 
 @section('content')
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <!-- Rechange Section -->
-        <div class="col-md-6 mb-4">
-            <div class="card border-0 shadow-sm rounded-4">
-                <div class="card-header bg-primary text-white text-center py-4 rounded-top-4 border-0">
-                    <h5 class="mb-0 text-white-50 small text-uppercase fw-bold">Current Balance</h5>
-                    <h1 class="display-4 fw-bold mb-0">₹ {{ number_format((float) auth()->user()->wallet_balance, 2) }}</h1>
+    <div class="mx-auto" style="max-width: 600px;">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <div class="text-center mb-5">
+                    <p class="text-muted small fw-medium mb-1">Available Balance</p>
+                    <h2 class="display-5 fw-bold text-primary mb-0">
+                        ₹{{ number_format(auth()->user()->wallet_balance ?? 0, 2) }}</h2>
                 </div>
-                <div class="card-body p-4">
-                    <h5 class="fw-bold mb-3"><i class="fas fa-plus-circle text-primary me-2"></i>Add Money</h5>
-                    
-                    <form action="{{ route('wallet.initiate') }}" method="POST">
-                        @csrf
-                        <div class="mb-4">
-                            <label class="form-label text-muted small fw-bold">Enter Amount (₹)</label>
-                            <div class="input-group input-group-lg">
-                                <span class="input-group-text bg-white border-end-0 text-muted">₹</span>
-                                <input type="number" name="amount" id="amountInput" class="form-control border-start-0 ps-0 fw-bold text-dark" 
-                                       placeholder="500" min="1" required step="1">
-                            </div>
-                        </div>
 
-                        <!-- Quick Amounts -->
-                        <div class="d-flex flex-wrap gap-2 mb-4">
-                            @foreach([100, 200, 500, 1000, 2000] as $amt)
-                                <button type="button" class="btn btn-outline-secondary rounded-pill fw-bold px-3 py-1 btn-sm amount-pill" 
-                                        onclick="document.getElementById('amountInput').value = {{ $amt }}">
-                                    + ₹{{ $amt }}
+                <form action="{{ route('user.wallet.initiate') }}" method="POST" x-data="{ amount: '' }">
+                    @csrf
+
+                    <h6 class="fw-bold text-dark mb-3">Select Amount</h6>
+                    <div class="row g-2 mb-4">
+                        @foreach([100, 200, 500, 1000, 2000, 5000] as $amt)
+                            <div class="col-4">
+                                <button type="button" @click="amount = '{{ $amt }}'"
+                                    :class="amount == '{{ $amt }}' ? 'btn-primary shadow' : 'btn-outline-primary'"
+                                    class="btn w-100 py-3 fw-bold transition">
+                                    ₹{{ $amt }}
                                 </button>
-                            @endforeach
-                        </div>
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm">
-                                Proceed to Pay
-                            </button>
-                        </div>
-                        <div class="text-center mt-3">
-                            <span class="small text-muted"><i class="fas fa-shield-alt me-1"></i> Secured by PhonePe</span>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- History Section -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm rounded-4 h-100">
-                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold">Recent Transactions</h6>
-                    <a href="#" class="small text-decoration-none">View All</a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        @forelse($transactions as $txn)
-                            <div class="list-group-item border-0 py-3 px-4 d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-3">
-                                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
-                                        @if($txn->type == 'credit')
-                                            <i class="fas fa-arrow-down text-success"></i>
-                                        @else
-                                            <i class="fas fa-arrow-up text-danger"></i>
-                                        @endif
-                                    </div>
-                                    <div>
-                                        <div class="fw-bold text-dark small">{{ $txn->description ?? ucfirst($txn->type) }}</div>
-                                        <div class="small text-muted" style="font-size: 0.75rem;">
-                                            {{ $txn->created_at->format('d M, h:i A') }}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="fw-bold {{ $txn->type == 'credit' ? 'text-success' : 'text-danger' }}">
-                                        {{ $txn->type == 'credit' ? '+' : '-' }} ₹{{ number_format($txn->amount, 2) }}
-                                    </div>
-                                    <div class="small text-muted" style="font-size: 0.7rem;">{{ $txn->status ?? 'Success' }}</div>
-                                </div>
                             </div>
-                        @empty
-                            <div class="text-center py-5 text-muted small">
-                                No transactions yet.
-                            </div>
-                        @endforelse
+                        @endforeach
                     </div>
-                </div>
+
+                    <div class="mb-4">
+                        <label for="amount" class="form-label small fw-medium text-muted">Or Enter Custom Amount</label>
+                        <div class="input-group input-group-lg shadow-sm">
+                            <span class="input-group-text bg-white border-end-0">₹</span>
+                            <input type="number" name="amount" id="amount" x-model="amount"
+                                class="form-control border-start-0 ps-1 fw-bold" placeholder="0.00" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-3">
+                        <button type="submit" class="btn btn-success btn-lg py-3 fw-bold shadow-sm transition">
+                            <i class="bi bi-shield-check me-2"></i>Proceed to Pay
+                        </button>
+
+                        <div class="text-center">
+                            <p class="text-muted x-small mb-0">
+                                <i class="bi bi-lock-fill me-1"></i>Secure checkout powered by PhonePe
+                            </p>
+                            <p class="text-muted x-small mt-1 opacity-75">
+                                By proceeding, you agree to our <a href="#" class="text-decoration-none">Terms of
+                                    Service</a>.
+                            </p>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
-</div>
+
+    <style>
+        .transition {
+            transition: all 0.2s ease;
+        }
+
+        .x-small {
+            font-size: 0.75rem;
+        }
+    </style>
 @endsection

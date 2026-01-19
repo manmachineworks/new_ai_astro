@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AstrologerProfile;
+use App\Models\AstrologerPricingHistory;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,10 +91,29 @@ class AstrologerController extends Controller
             'availability_schedule' => 'nullable|array', // Validate structure in a real app
         ]);
 
+        $existingProfile = $user->astrologerProfile;
+        $oldCall = $existingProfile?->call_per_minute;
+        $oldChat = $existingProfile?->chat_per_session;
+
         $profile = $user->astrologerProfile()->updateOrCreate(
             ['user_id' => $user->id],
             $validated
         );
+
+        $newCall = $profile->call_per_minute;
+        $newChat = $profile->chat_per_session;
+
+        if ($oldCall != $newCall || $oldChat != $newChat) {
+            AstrologerPricingHistory::create([
+                'astrologer_profile_id' => $profile->id,
+                'old_call_per_minute' => $oldCall,
+                'new_call_per_minute' => $newCall,
+                'old_chat_per_session' => $oldChat,
+                'new_chat_per_session' => $newChat,
+                'changed_by_user_id' => $user->id,
+                'change_source' => 'astrologer',
+            ]);
+        }
 
         return response()->json($profile);
     }
@@ -106,6 +126,7 @@ class AstrologerController extends Controller
         $request->validate([
             'is_call_enabled' => 'boolean',
             'is_chat_enabled' => 'boolean',
+            'is_appointment_enabled' => 'boolean',
             'visibility' => 'boolean',
         ]);
 
@@ -113,6 +134,7 @@ class AstrologerController extends Controller
         $user->astrologerProfile()->update($request->only([
             'is_call_enabled',
             'is_chat_enabled',
+            'is_appointment_enabled',
             'visibility'
         ]));
 

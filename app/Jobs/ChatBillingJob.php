@@ -24,6 +24,10 @@ class ChatBillingJob implements ShouldQueue
         // Find active sessions that need billing
         $sessions = ChatSession::where('status', 'active')
             ->where(function ($query) {
+                $query->whereNull('pricing_mode')
+                    ->orWhere('pricing_mode', 'per_minute');
+            })
+            ->where(function ($query) {
                 $query->where(function ($q) {
                     // First minute billing: if started > 1 min ago and never billed
                     $q->whereNull('last_billed_at')

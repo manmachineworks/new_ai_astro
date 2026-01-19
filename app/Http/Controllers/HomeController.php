@@ -37,6 +37,12 @@ class HomeController extends Controller
             $sectionTitle = "Top Astrologers";
         }
 
-        return view('welcome', compact('featuredAstrologers', 'sectionTitle'));
+        $latestBlogs = \App\Models\BlogPost::where('status', 'published')
+            ->orderByDesc('published_at')
+            ->take(3)
+            ->with('author')
+            ->get();
+
+        return view('welcome', compact('featuredAstrologers', 'sectionTitle', 'latestBlogs'));
     }
 }

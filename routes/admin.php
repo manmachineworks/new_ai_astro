@@ -4,6 +4,11 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PricingSettingsController;
 use App\Http\Controllers\Admin\AdminAstrologerController;
+use App\Http\Controllers\Admin\ChatModerationController;
+use App\Http\Controllers\Admin\ChatBannedWordController;
+use App\Http\Controllers\Admin\AdminReviewController;
+use App\Http\Controllers\Admin\DisputeController;
+use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\CallController;
 use App\Http\Controllers\Admin\AppointmentController;
@@ -20,13 +25,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('/login', [AdminAuthController::class, 'login'])->name('login.submit');
 });
 
-Route::middleware(['auth', 'role:Super Admin|Admin|Finance Admin|Support Admin|Ops Admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'admin.auth'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
 
     // 1. Admin Management (Super Admin Only)
     Route::middleware('permission:manage_roles')->group(function () {
         Route::resource('admin-users', AdminUserManagementController::class);
+        Route::post('admin-users/{admin}/toggle', [AdminUserManagementController::class, 'toggleStatus'])->name('admin-users.toggle');
+        Route::post('admin-users/{admin}/force-logout', [AdminUserManagementController::class, 'forceLogout'])->name('admin-users.force-logout');
         Route::resource('roles', \App\Http\Controllers\Admin\AdminRoleController::class)->names('roles');
     });
 
@@ -35,6 +42,10 @@ Route::middleware(['auth', 'role:Super Admin|Admin|Finance Admin|Support Admin|O
         Route::post('/users/bulk-action', [\App\Http\Controllers\Admin\AdminUserController::class, 'bulkAction'])->name('users.bulk_action')->middleware('permission:manage_users');
         Route::resource('users', \App\Http\Controllers\Admin\AdminUserController::class)->names('users')->only(['index', 'show', 'edit', 'update']);
         Route::post('/users/{user}/toggle', [\App\Http\Controllers\Admin\AdminUserController::class, 'toggle'])->name('users.toggle')->middleware('permission:manage_users');
+        Route::post('/users/{user}/block', [\App\Http\Controllers\Admin\AdminUserController::class, 'block'])->name('users.block')->middleware('permission:manage_users');
+        Route::post('/users/{user}/unblock', [\App\Http\Controllers\Admin\AdminUserController::class, 'unblock'])->name('users.unblock')->middleware('permission:manage_users');
+        Route::post('/users/{user}/ai-chat/block', [\App\Http\Controllers\Admin\AdminUserController::class, 'restrictAiChat'])->name('users.ai_chat.block')->middleware('permission:manage_users');
+        Route::post('/users/{user}/ai-chat/unblock', [\App\Http\Controllers\Admin\AdminUserController::class, 'liftAiChatRestriction'])->name('users.ai_chat.unblock')->middleware('permission:manage_users');
     });
 
     // 3. Astrologer Management
@@ -49,6 +60,12 @@ Route::middleware(['auth', 'role:Super Admin|Admin|Finance Admin|Support Admin|O
         });
 
         Route::put('/astrologers/{id}/toggle-visibility', [AdminAstrologerController::class, 'toggleVisibility'])->name('astrologers.toggleVisibility')->middleware('permission:toggle_astrologer_visibility');
+        Route::put('/astrologers/{id}/profile', [AdminAstrologerController::class, 'updateProfile'])->name('astrologers.profile.update')->middleware('permission:manage_astrologers');
+        Route::put('/astrologers/{id}/services', [AdminAstrologerController::class, 'updateServices'])->name('astrologers.services.update')->middleware('permission:manage_astrologers');
+        Route::post('/astrologers/{id}/availability/rules', [AdminAstrologerController::class, 'storeAvailabilityRule'])->name('astrologers.availability.rules.store')->middleware('permission:manage_astrologers');
+        Route::delete('/astrologers/{id}/availability/rules/{rule}', [AdminAstrologerController::class, 'deleteAvailabilityRule'])->name('astrologers.availability.rules.delete')->middleware('permission:manage_astrologers');
+        Route::post('/astrologers/{id}/availability/exceptions', [AdminAstrologerController::class, 'storeAvailabilityException'])->name('astrologers.availability.exceptions.store')->middleware('permission:manage_astrologers');
+        Route::delete('/astrologers/{id}/availability/exceptions/{exception}', [AdminAstrologerController::class, 'deleteAvailabilityException'])->name('astrologers.availability.exceptions.delete')->middleware('permission:manage_astrologers');
     });
 
     // 4. Finance (Payments & Wallets)
@@ -114,6 +131,24 @@ Route::middleware(['auth', 'role:Super Admin|Admin|Finance Admin|Support Admin|O
         Route::get('/ai-chats/{id}', [\App\Http\Controllers\Admin\AdminAiChatController::class, 'show'])->name('ai_chats.show');
     });
 
+    // Moderation
+    Route::middleware('permission:manage_chats')->prefix('moderation')->name('moderation.')->group(function () {
+        Route::get('/chats', [ChatModerationController::class, 'index'])->name('chats.index');
+        Route::post('/chats/{thread}/mute', [ChatModerationController::class, 'mute'])->name('chats.mute');
+        Route::post('/chats/{thread}/unmute/{target}', [ChatModerationController::class, 'unmute'])->name('chats.unmute');
+
+        Route::get('/banned-words', [ChatBannedWordController::class, 'index'])->name('banned_words.index');
+        Route::post('/banned-words', [ChatBannedWordController::class, 'store'])->name('banned_words.store');
+        Route::post('/banned-words/{word}/toggle', [ChatBannedWordController::class, 'toggle'])->name('banned_words.toggle');
+        Route::delete('/banned-words/{word}', [ChatBannedWordController::class, 'destroy'])->name('banned_words.destroy');
+    });
+
+    Route::middleware('permission:manage_reviews')->group(function () {
+        Route::get('/reviews', [AdminReviewController::class, 'index'])->name('reviews.index');
+        Route::put('/reviews/{review}', [AdminReviewController::class, 'update'])->name('reviews.update');
+        Route::delete('/reviews/{review}', [AdminReviewController::class, 'destroy'])->name('reviews.destroy');
+    });
+
     // 6. Settings & System (Super Admin / Specific Permissions)
     Route::middleware('permission:manage_ai_settings')->group(function () {
         Route::get('/ai-settings', [App\Http\Controllers\Admin\AiSettingsController::class, 'index'])->name('ai.settings');
@@ -166,9 +201,20 @@ Route::middleware(['auth', 'role:Super Admin|Admin|Finance Admin|Support Admin|O
         // ... appointments ...
     });
 
-    // Support Tickets
-    Route::prefix('support')->name('support.')->group(function () {
-        Route::get('/', [App\Http\Controllers\Admin\SupportController::class, 'index'])->name('index');
-        // ... support ...
+    // Support Tickets & Complaints
+    Route::middleware('permission:manage_reviews')->prefix('support')->name('support.')->group(function () {
+        Route::get('/', [SupportController::class, 'index'])->name('index');
+        Route::get('/{id}', [SupportController::class, 'show'])->name('show');
+        Route::post('/{id}/reply', [SupportController::class, 'reply'])->name('reply');
+        Route::post('/{id}/close', [SupportController::class, 'close'])->name('close');
+        Route::post('/{id}/resolve', [SupportController::class, 'resolve'])->name('resolve');
+    });
+
+    Route::middleware('permission:manage_reviews')->prefix('disputes')->name('disputes.')->group(function () {
+        Route::get('/', [DisputeController::class, 'index'])->name('index');
+        Route::get('/{id}', [DisputeController::class, 'show'])->name('show');
+        Route::post('/{id}/request-info', [DisputeController::class, 'requestInfo'])->name('request_info');
+        Route::post('/{id}/approve', [DisputeController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject', [DisputeController::class, 'reject'])->name('reject');
     });
 });

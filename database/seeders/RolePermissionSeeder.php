@@ -32,6 +32,7 @@ class RolePermissionSeeder extends Seeder
             'manage_calls', // Dispute checks
             'view_chats',
             'manage_chats',
+            'manage_reviews',
 
             // AI Features
             'view_ai_chats',
@@ -98,6 +99,7 @@ class RolePermissionSeeder extends Seeder
             'view_astrologers',
             'view_calls',
             'view_chats',
+            'manage_reviews',
             'view_finance', // Read-only to answer questions
         ]);
 
@@ -111,6 +113,16 @@ class RolePermissionSeeder extends Seeder
             'verify_astrologers',
             'toggle_astrologer_visibility',
             'manage_content',
+        ]);
+
+        // E. Moderator (Reviews/Chats)
+        $moderator = Role::firstOrCreate(['name' => 'Moderator']);
+        $moderator->givePermissionTo([
+            'view_acp',
+            'view_users',
+            'view_chats',
+            'manage_chats',
+            'manage_reviews',
         ]);
 
         // Legacy/User Roles

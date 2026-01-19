@@ -171,6 +171,25 @@
         </div>
     </div>
 
+    <!-- Global Confirmation Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalLabel">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="confirmModalBody">
+                    Are you sure you want to proceed?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" data-confirm-action>Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -180,6 +199,39 @@
         // Global Tooltip Initialization
         const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
         const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+
+        // Global Confirmation Modal for critical actions
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (!form.matches('form[data-confirm]')) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const modalEl = document.getElementById('confirmModal');
+            if (!modalEl) {
+                form.submit();
+                return;
+            }
+
+            const title = form.getAttribute('data-confirm-title') || 'Confirm Action';
+            const text = form.getAttribute('data-confirm-text') || 'Are you sure you want to proceed?';
+
+            modalEl.querySelector('#confirmModalLabel').textContent = title;
+            modalEl.querySelector('#confirmModalBody').textContent = text;
+
+            const confirmButton = modalEl.querySelector('[data-confirm-action]');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            const handler = function () {
+                confirmButton.removeEventListener('click', handler);
+                form.submit();
+            };
+
+            confirmButton.addEventListener('click', handler);
+            modal.show();
+        });
     </script>
     @stack('scripts')
 </body>

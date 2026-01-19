@@ -42,6 +42,11 @@ class BlogPost extends Model
         });
     }
 
+    public function author()
+    {
+        return $this->belongsTo(User::class, 'author_admin_id');
+    }
+
     public function category()
     {
         return $this->belongsTo(BlogCategory::class, 'blog_category_id');
