@@ -10,7 +10,7 @@
 
                     {{-- Search --}}
                     <div class="mt-4 mx-auto" style="max-width: 500px;">
-                        <form action="{{ route('blogs.index') }}" method="GET" class="position-relative">
+                        <form action="{{ route('blog.index') }}" method="GET" class="position-relative">
                             <input type="text" name="search" class="form-control form-control-lg ps-5 rounded-pill"
                                 placeholder="Search topics..." value="{{ request('search') }}">
                             <i
@@ -20,10 +20,10 @@
 
                     {{-- Categories --}}
                     <div class="mt-4 d-flex flex-wrap justify-content-center gap-2">
-                        <a href="{{ route('blogs.index') }}"
+                        <a href="{{ route('blog.index') }}"
                             class="btn btn-sm rounded-pill {{ !request('category') ? 'btn-primary' : 'btn-outline-secondary' }}">All</a>
                         @foreach(['Horoscope', 'Vastu', 'Numerology', 'Tarot'] as $cat)
-                            <a href="{{ route('blogs.index', ['category' => $cat]) }}"
+                            <a href="{{ route('blog.index', ['category' => $cat]) }}"
                                 class="btn btn-sm rounded-pill {{ request('category') == $cat ? 'btn-primary' : 'btn-outline-secondary' }}">{{ $cat }}</a>
                         @endforeach
                     </div>
@@ -43,7 +43,7 @@
                     <div class="mb-3"><i class="bi bi-journal-x fs-1 text-muted"></i></div>
                     <h4>No articles found</h4>
                     <p class="text-secondary">Try adjusting your search or category.</p>
-                    <a href="{{ route('blogs.index') }}" class="btn btn-outline-primary">Clear Filters</a>
+                    <a href="{{ route('blog.index') }}" class="btn btn-outline-primary">Clear Filters</a>
                 </div>
             @endforelse
         </div>

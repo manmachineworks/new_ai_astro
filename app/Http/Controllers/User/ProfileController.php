@@ -11,6 +11,17 @@ class ProfileController extends Controller
     public function index()
     {
         $user = auth()->user();
+
+        // Ensure profile exists
+        if (!$user->profile) {
+            $user->profile()->create([
+                'user_id' => $user->id,
+                'name' => $user->name,
+                // Add default fields if necessary
+            ]);
+            $user->refresh();
+        }
+
         $user->load('profile'); // Ensure profile is loaded
 
         $verification = [

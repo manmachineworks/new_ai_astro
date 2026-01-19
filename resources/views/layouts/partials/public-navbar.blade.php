@@ -18,7 +18,7 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {{ request()->routeIs('blogs.*') ? 'active' : '' }}"
-                        href="{{ route('blogs.index') }}">Blogs</a>
+                        href="{{ route('blog.index') }}">Blogs</a>
                 </li>
             </ul>
             <div class="d-flex grid gap-2">
@@ -26,7 +26,9 @@
                     <a href="{{ route('user.dashboard') }}" class="btn btn-outline-primary">Dashboard</a>
                 @else
                     <a href="{{ route('login') }}" class="btn btn-outline-primary">Log In</a>
-                    <a href="{{ route('register') }}" class="btn btn-primary">Get Started</a>
+                    @if (Route::has('register'))
+                        <a href="{{ route('register') }}" class="btn btn-primary">Get Started</a>
+                    @endif
                 @endauth
             </div>
         </div>

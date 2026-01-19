@@ -17,7 +17,9 @@ class BlogController extends Controller
             ->latest('published_at')
             ->paginate(9);
 
-        return view('blog.index', compact('posts'));
+        $categories = BlogCategory::where('locale', $locale)->get();
+
+        return view('blog.index', compact('posts', 'categories'));
     }
 
     public function show($slug)
@@ -49,6 +51,8 @@ class BlogController extends Controller
             ->latest('published_at')
             ->paginate(9);
 
-        return view('blog.index', compact('posts', 'category'));
+        $categories = BlogCategory::where('locale', $locale)->get();
+
+        return view('blog.index', compact('posts', 'category', 'categories'));
     }
 }

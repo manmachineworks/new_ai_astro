@@ -9,7 +9,7 @@ class AppointmentController extends Controller
 {
     public function index()
     {
-        $upcoming = [
+        $upcomingAppointments = [
             [
                 'id' => 101,
                 'astrologer_name' => 'Astro Priya',
@@ -20,7 +20,7 @@ class AppointmentController extends Controller
             ]
         ];
 
-        $past = [
+        $pastAppointments = [
             [
                 'id' => 99,
                 'astrologer_name' => 'Dr. Sharma',
@@ -39,7 +39,7 @@ class AppointmentController extends Controller
             ]
         ];
 
-        return view('user.appointments.index', compact('upcoming', 'past'));
+        return view('user.appointments.index', compact('upcomingAppointments', 'pastAppointments'));
     }
 
     public function book(Request $request, $astrologerId)

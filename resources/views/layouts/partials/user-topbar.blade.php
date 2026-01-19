@@ -65,7 +65,7 @@
                         <hr class="dropdown-divider">
                     </li>
                     <li>
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form method="POST" action="{{ route('auth.logout') }}">
                             @csrf
                             <button class="dropdown-item text-danger" type="submit"><i
                                     class="bi bi-box-arrow-right me-2"></i>Sign Out</button>

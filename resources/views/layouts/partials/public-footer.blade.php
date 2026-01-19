@@ -18,7 +18,7 @@
                     </li>
                     <li><a href="{{ route('user.astrologers.index') }}"
                             class="text-decoration-none text-secondary hover-text-white">Astrologers</a></li>
-                    <li><a href="{{ route('blogs.index') }}"
+                    <li><a href="{{ route('blog.index') }}"
                             class="text-decoration-none text-secondary hover-text-white">Blogs</a></li>
                 </ul>
             </div>

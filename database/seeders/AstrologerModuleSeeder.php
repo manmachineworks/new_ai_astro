@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class AstrologerModuleSeeder extends Seeder
@@ -137,34 +138,62 @@ class AstrologerModuleSeeder extends Seeder
             ]
         );
 
+        $chatPayload = [
+            'astrologer_id' => $astrologer->id,
+            'user_id' => $client->id,
+            'user_public_id' => $client->publicId(),
+            'status' => 'closed',
+            'started_at' => now()->subDays(2),
+            'ended_at' => now()->subDays(1),
+            'chat_price' => 120,
+            'amount_charged' => 120,
+        ];
+
+        if (Schema::hasColumn('chat_sessions', 'conversation_id')) {
+            $chatPayload['conversation_id'] = 'seed-chat-001';
+        }
+        if (Schema::hasColumn('chat_sessions', 'astrologer_user_id')) {
+            $chatPayload['astrologer_user_id'] = $astrologerUser->id;
+        }
+
         ChatSession::firstOrCreate(
             ['firebase_chat_id' => 'seed-chat-001'],
-            [
-                'astrologer_id' => $astrologer->id,
-                'user_id' => $client->id,
-                'user_public_id' => $client->publicId(),
-                'status' => 'closed',
-                'started_at' => now()->subDays(2),
-                'ended_at' => now()->subDays(1),
-                'chat_price' => 120,
-                'amount_charged' => 120,
-            ]
+            $chatPayload
         );
 
-        Appointment::updateOrCreate(
-            [
-                'user_id' => $client->id,
-                'astrologer_user_id' => $astrologerUser->id,
-                'start_at' => now()->addDays(2),
-            ],
-            [
-                'end_at' => now()->addDays(2)->addHour(),
-                'status' => 'pending',
-                'payment_status' => 'unpaid',
-                'price' => 900,
-                'notes' => 'Booking for career guidance',
-            ]
-        );
+        if (Schema::hasColumn('appointments', 'astrologer_profile_id')) {
+            Appointment::updateOrCreate(
+                [
+                    'user_id' => $client->id,
+                    'astrologer_profile_id' => $astrologer->id,
+                    'start_at_utc' => now()->addDays(2),
+                ],
+                [
+                    'end_at_utc' => now()->addDays(2)->addHour(),
+                    'duration_minutes' => 60,
+                    'status' => 'requested',
+                    'pricing_mode' => 'session',
+                    'price_total' => 900,
+                    'rate_snapshot' => 900,
+                    'notes_user' => 'Booking for career guidance',
+                ]
+            );
+        } else {
+            Appointment::updateOrCreate(
+                [
+                    'user_id' => $client->id,
+                    'astrologer_user_id' => $astrologerUser->id,
+                    'start_at' => now()->addDays(2),
+                ],
+                [
+                    'end_at' => now()->addDays(2)->addHour(),
+                    'status' => 'pending',
+                    'payment_status' => 'unpaid',
+                    'price' => 900,
+                    'notes' => 'Booking for career guidance',
+                ]
+            );
+        }
 
         Earning::firstOrCreate(
             [

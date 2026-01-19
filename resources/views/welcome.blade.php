@@ -17,7 +17,9 @@
                             <a href="{{ route('user.wallet.index') }}" class="btn btn-outline-light btn-lg px-4">Recharge
                                 Wallet</a>
                         @else
-                            <a href="{{ route('register') }}" class="btn btn-outline-light btn-lg px-4">Get Started</a>
+                            @if (Route::has('register'))
+                                <a href="{{ route('register') }}" class="btn btn-outline-light btn-lg px-4">Get Started</a>
+                            @endif
                         @endauth
                     </div>
                 </div>
@@ -132,7 +134,7 @@
                     <h2 class="fw-bold mb-1">Latest from Blog</h2>
                     <p class="text-secondary mb-0">Insights into your astrological journey</p>
                 </div>
-                <a href="{{ route('blogs.index') }}" class="btn btn-link text-decoration-none fw-medium">View All <i
+                <a href="{{ route('blog.index') }}" class="btn btn-link text-decoration-none fw-medium">View All <i
                         class="bi bi-arrow-right"></i></a>
             </div>
 

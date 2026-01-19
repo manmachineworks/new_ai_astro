@@ -26,21 +26,23 @@
 
     // Auto-Login if User is Auth'd in Laravel
     @auth
+        {{--
         fetch("{{ route('firebase.token') }}")
-            .then(res => res.json())
-            .then(data => {
-                if (data.firebase_token) {
-                    signInWithCustomToken(auth, data.firebase_token)
-                        .then((userCredential) => {
-                            console.log("Firebase Auth Success:", userCredential.user.uid);
-                            window.currentUserUid = userCredential.user.uid;
-                            // Dispatch event
-                            window.dispatchEvent(new CustomEvent('firebase-ready', { detail: userCredential.user }));
-                        })
-                        .catch((error) => {
-                            console.error("Firebase Auth Error", error);
-                        });
-                }
-            });
+        .then(res => res.json())
+        .then(data => {
+            if (data.firebase_token) {
+                signInWithCustomToken(auth, data.firebase_token)
+                    .then((userCredential) => {
+                        console.log("Firebase Auth Success:", userCredential.user.uid);
+                        window.currentUserUid = userCredential.user.uid;
+                        // Dispatch event
+                        window.dispatchEvent(new CustomEvent('firebase-ready', { detail: userCredential.user }));
+                    })
+                    .catch((error) => {
+                        console.error("Firebase Auth Error", error);
+                    });
+            }
+        });
+        --}}
     @endauth
 </script>

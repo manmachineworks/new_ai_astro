@@ -72,7 +72,7 @@
                 Settings
             </x-user.nav-link>
 
-            <form method="POST" action="{{ route('logout') }}" class="mt-2">
+            <form method="POST" action="{{ route('auth.logout') }}" class="mt-2">
                 @csrf
                 <button type="submit"
                     class="list-group-item list-group-item-action border-0 d-flex align-items-center gap-3 py-3 text-danger">

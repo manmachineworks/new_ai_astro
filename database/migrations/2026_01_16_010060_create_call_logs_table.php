@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('call_logs', function (Blueprint $table) {
+        Schema::create('call_webhook_logs', function (Blueprint $table) {
             $table->id();
             $table->string('provider', 50);
             $table->string('event_type', 100);
@@ -30,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('call_logs');
+        Schema::dropIfExists('call_webhook_logs');
     }
 };

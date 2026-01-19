@@ -50,7 +50,22 @@ class HoroscopeController extends Controller
             ]
         ];
 
-        return view('user.horoscope.index', compact('user', 'horoscope', 'reports'));
+        $zodiacSigns = [
+            ['name' => 'Aries', 'dates' => 'Mar 21 - Apr 19', 'icon' => 'aries'],
+            ['name' => 'Taurus', 'dates' => 'Apr 20 - May 20', 'icon' => 'taurus'],
+            ['name' => 'Gemini', 'dates' => 'May 21 - Jun 20', 'icon' => 'gemini'],
+            ['name' => 'Cancer', 'dates' => 'Jun 21 - Jul 22', 'icon' => 'cancer'],
+            ['name' => 'Leo', 'dates' => 'Jul 23 - Aug 22', 'icon' => 'leo'],
+            ['name' => 'Virgo', 'dates' => 'Aug 23 - Sep 22', 'icon' => 'virgo'],
+            ['name' => 'Libra', 'dates' => 'Sep 23 - Oct 22', 'icon' => 'libra'],
+            ['name' => 'Scorpio', 'dates' => 'Oct 23 - Nov 21', 'icon' => 'scorpio'],
+            ['name' => 'Sagittarius', 'dates' => 'Nov 22 - Dec 21', 'icon' => 'sagittarius'],
+            ['name' => 'Capricorn', 'dates' => 'Dec 22 - Jan 19', 'icon' => 'capricorn'],
+            ['name' => 'Aquarius', 'dates' => 'Jan 20 - Feb 18', 'icon' => 'aquarius'],
+            ['name' => 'Pisces', 'dates' => 'Feb 19 - Mar 20', 'icon' => 'pisces'],
+        ];
+
+        return view('user.horoscope.index', compact('user', 'horoscope', 'reports', 'zodiacSigns'));
     }
 
     public function show($type)
